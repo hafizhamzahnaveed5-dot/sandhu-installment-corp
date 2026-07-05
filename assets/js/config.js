@@ -17,14 +17,14 @@ export const Config = {
   // DECISION: Set this to your backend URL when connecting a real database.
   // e.g., 'https://api.sandhuinstallments.com' for production
   //       'http://localhost:3000' for local dev
-  API_BASE_URL: '/api',
+  API_BASE_URL: 'https://sandhu-installment-corp-production.up.railway.app/api',
 
   // ── Feature Flags ──────────────────────────────────────────
   FEATURE_FLAGS: {
     // When true, all service calls resolve from mock data instead of fetch()
     // DECISION: This flag is the single switch for mock vs. real data.
     // Set to false once a real backend is connected.
-    MOCK_MODE: true,
+    MOCK_MODE: false,
 
     // Enable the AI assistant panel (chat UI only, no real LLM in mock mode)
     AI_ASSISTANT: true,
