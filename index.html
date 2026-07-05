@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sandhu Installment Corporation — Smart & Secure Fintech Platform</title>
+  
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="Production-grade platform for Sandhu Installment Corporation. Fast, secure installment plan tracking and collection ledger.">
+  
+  <!-- CSS Stylesheets -->
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/layout.css">
+  <link rel="stylesheet" href="assets/css/print.css" media="print">
+  
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+</head>
+<body>
+
+  <!-- Global error trap — shows crash details on-screen if app.js fails to boot -->
+  <script>
+    window.onerror = function(msg, src, line, col, err) {
+      document.body.innerHTML = '<div style="font-family:monospace;padding:32px;color:#ff6b6b;background:#0d0d1a;min-height:100vh">'
+        + '<h2 style="color:#fff;margin-bottom:16px">⚠️ App boot error</h2>'
+        + '<p style="margin-bottom:8px"><strong>Message:</strong> ' + msg + '</p>'
+        + '<p style="margin-bottom:8px"><strong>File:</strong> ' + src + '</p>'
+        + '<p style="margin-bottom:8px"><strong>Line:</strong> ' + line + ':' + col + '</p>'
+        + '<pre style="white-space:pre-wrap;color:#ffd93d;margin-top:16px">' + (err ? err.stack : '') + '</pre>'
+        + '</div>';
+    };
+    window.addEventListener('unhandledrejection', function(e) {
+      document.body.innerHTML = '<div style="font-family:monospace;padding:32px;color:#ff6b6b;background:#0d0d1a;min-height:100vh">'
+        + '<h2 style="color:#fff;margin-bottom:16px">⚠️ Unhandled Promise Rejection</h2>'
+        + '<pre style="white-space:pre-wrap;color:#ffd93d">' + (e.reason ? (e.reason.stack || e.reason) : e) + '</pre>'
+        + '</div>';
+    });
+  </script>
+
+  <!-- AUTH LAYOUT (Login, Forgot Password) -->
+  <div id="auth-layout" style="display: none;"></div>
+
+  <!-- APPLICATION SHELL (Dashboard & Operations) -->
+  <div id="app-shell" style="display: none;">
+    <!-- Sidebar navigation -->
+    <aside id="sidebar"></aside>
+
+    <!-- Mobile Navigation Overlay backdrop -->
+    <div id="sidebar-overlay"></div>
+
+    <!-- Main Workspace wrapper -->
+    <div id="main-wrapper">
+      <!-- Navbar / Top Header -->
+      <header id="topbar"></header>
+
+      <!-- Dynamic Page Container -->
+      <main id="page-content"></main>
+    </div>
+  </div>
+
+  <!-- Main Routing Logic -->
+  <script type="module" src="assets/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,227 @@
+/* ============================================================
+   PRINT STYLESHEET — Sandhu Installment Corporation
+   Dedicated B&W print layout for receipts.
+   
+   DESIGN DECISION: This stylesheet completely overrides the app theme
+   (dark or light) for printing. It does NOT rely on the active CSS
+   theme variables — it resets every variable explicitly so the output
+   is identical regardless of which theme the user has active.
+   
+   Tested in both dark mode and light mode print preview:
+   → Always: white background, black text, clean borders.
+   ============================================================ */
+
+@media print {
+
+  /* ── 1. Reset ALL CSS custom properties used by the app ── */
+  /* This is the critical fix: var(--color-bg-elevated) etc. would otherwise
+     inherit the dark-theme values even when background:#fff is set,
+     because !important applies to the consumer rule, not the variable itself. */
+  :root,
+  [data-theme="dark"],
+  [data-theme="light"] {
+    --color-bg-primary:       #ffffff;
+    --color-bg-secondary:     #f5f5f5;
+    --color-bg-elevated:      #ffffff;
+    --color-bg-glass:         #ffffff;
+    --color-bg-hover:         #f0f0f0;
+    --color-text-primary:     #000000;
+    --color-text-secondary:   #333333;
+    --color-text-tertiary:    #555555;
+    --color-border:           #cccccc;
+    --color-border-strong:    #999999;
+    --color-accent-blue:      #000000;
+    --color-accent-green:     #000000;
+    --color-accent-red:       #000000;
+    --color-accent-amber:     #000000;
+    --color-accent-cyan:      #000000;
+    --color-accent-blue-dim:  #f0f0f0;
+    --color-accent-green-dim: #f0f0f0;
+    --color-accent-red-dim:   #f0f0f0;
+    --color-accent-amber-dim: #f0f0f0;
+    --shadow-sm:              none;
+    --shadow-md:              none;
+    --shadow-lg:              none;
+    backdrop-filter:          none;
+    -webkit-backdrop-filter:  none;
+  }
+
+  /* ── 2. Page setup ── */
+  @page {
+    size: A4 portrait;
+    margin: 15mm 20mm;
+  }
+
+  /* ── 3. Base reset ── */
+  *,
+  *::before,
+  *::after {
+    background:    white !important;
+    color:         black !important;
+    box-shadow:    none !important;
+    text-shadow:   none !important;
+    border-color:  #cccccc !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif !important;
+    font-size: 11pt;
+    line-height: 1.5;
+  }
+
+  /* ── 4. Hide everything except the receipt ── */
+  #sidebar,
+  #topbar,
+  #sidebar-overlay,
+  .fab-container,
+  #toast-container,
+  .ai-panel,
+  .ai-fab,
+  .no-print,
+  .page-header-actions,
+  .topbar-notif,
+  .theme-toggle,
+  .filter-bar,
+  .breadcrumb,
+  [id="global-search-btn"] {
+    display: none !important;
+  }
+
+  /* ── 5. Layout reset ── */
+  #app-shell {
+    display: block !important;
+  }
+  #main-wrapper {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+  #page-content {
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  /* ── 6. Receipt card: pure black-on-white box layout ── */
+  .receipt-card {
+    background: white !important;
+    border: 2px solid black !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 24pt !important;
+    page-break-inside: avoid;
+  }
+
+  /* ── 7. Receipt header ── */
+  .receipt-header {
+    border-bottom: 2px solid black !important;
+    padding-bottom: 12pt !important;
+    margin-bottom: 12pt !important;
+    background: white !important;
+  }
+
+  /* Logo icon: print as black square with white icon */
+  .receipt-logo-icon,
+  .sidebar-logo-icon {
+    background: black !important;
+    border-radius: 4px !important;
+  }
+
+  .receipt-logo-icon svg path,
+  .sidebar-logo-icon svg path {
+    fill: white !important;
+    stroke: white !important;
+  }
+
+  /* ── 8. Typography — no thin/light weights ── */
+  h1, h2, h3, h4, h5 {
+    color: black !important;
+    font-weight: 700 !important;
+  }
+
+  .secondary,
+  [style*="color:var(--color-text-tertiary)"],
+  [style*="color:var(--color-text-secondary)"] {
+    color: #333333 !important;
+  }
+
+  /* ── 9. Amount display — large, bold, black (no green) ── */
+  h1[style*="color:var(--color-accent-green)"],
+  [style*="color:var(--color-accent-green)"],
+  [style*="color:var(--color-accent-blue)"],
+  [style*="color:var(--color-accent-red)"] {
+    color: black !important;
+  }
+
+  /* ── 10. Status badges — B&W replacements ──
+     Color badges become bordered text boxes, still clearly readable on B&W printer */
+  .badge {
+    background: white !important;
+    color: black !important;
+    border: 1.5px solid black !important;
+    font-weight: 700 !important;
+    border-radius: 3px !important;
+    padding: 2px 6px !important;
+  }
+
+  .badge-paid    { border-color: black !important; }
+  .badge-overdue { border-color: black !important; }
+  .badge-pending { border-color: black !important; }
+  .badge-active  { border-color: black !important; }
+
+  /* ── 11. Table borders ── */
+  table, th, td {
+    border: 1px solid #888888 !important;
+    border-collapse: collapse !important;
+    background: white !important;
+  }
+
+  th {
+    font-weight: 700 !important;
+    background: #f0f0f0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ── 12. Amount block ── */
+  [style*="background:var(--color-bg-secondary)"] {
+    background: #f5f5f5 !important;
+    border: 1.5px solid black !important;
+  }
+
+  /* ── 13. Signature lines ── */
+  [style*="border-bottom:1px solid"] {
+    border-bottom: 1px solid black !important;
+  }
+
+  /* ── 14. Dashed divider ── */
+  [style*="border-bottom:1px dashed"] {
+    border-bottom: 2px dashed #555555 !important;
+  }
+
+  /* ── 15. Prevent orphaned lines ── */
+  tr, .info-row {
+    page-break-inside: avoid;
+  }
+
+  /* ── 16. PAID watermark — print it as visible bold text ── */
+  .receipt-card::after {
+    content: 'PAID';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-30deg);
+    font-size: 72pt;
+    font-weight: 900;
+    color: rgba(0,0,0,0.06) !important;
+    letter-spacing: 8px;
+    pointer-events: none;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

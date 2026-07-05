@@ -1,0 +1,135 @@
+export function mapCustomer(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    fullName: row.full_name,
+    cnicOrId: row.cnic_or_id,
+    phone: row.phone,
+    email: row.email,
+    address: row.address,
+    city: row.city,
+    status: row.status,
+    createdAt: row.created_at?.toISOString?.() || row.created_at,
+    guarantorName: row.guarantor_name,
+    guarantorPhone: row.guarantor_phone,
+    documents: row.documents || [],
+    creditScore: Number(row.credit_score || 0),
+    totalOutstanding: Number(row.total_outstanding || 0),
+    notes: row.notes,
+  };
+}
+
+export function mapPlan(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    customerId: row.customer_id,
+    customerName: row.customer_name,
+    productId: row.product_id,
+    principalAmount: Number(row.principal_amount),
+    downPayment: Number(row.down_payment),
+    numberOfInstallments: Number(row.number_of_installments),
+    installmentAmount: Number(row.installment_amount),
+    frequency: row.frequency,
+    startDate: row.start_date?.toISOString?.().slice(0, 10) || row.start_date,
+    status: row.status,
+    interestOrMarkup: Number(row.interest_or_markup),
+    outstandingBalance: Number(row.outstanding_balance || 0),
+    createdBy: row.created_by,
+    createdAt: row.created_at?.toISOString?.() || row.created_at,
+  };
+}
+
+export function mapSchedule(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    planId: row.plan_id,
+    installmentNumber: Number(row.installment_number),
+    dueDate: row.due_date?.toISOString?.().slice(0, 10) || row.due_date,
+    amountDue: Number(row.amount_due),
+    amountPaid: Number(row.amount_paid),
+    status: row.status,
+    paidDate: row.paid_date?.toISOString?.() || row.paid_date,
+  };
+}
+
+export function mapPayment(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    planId: row.plan_id,
+    scheduleId: row.schedule_id,
+    customerId: row.customer_id,
+    amount: Number(row.amount),
+    method: row.method,
+    receivedBy: row.received_by,
+    receiptNumber: row.receipt_number,
+    paidAt: row.paid_at?.toISOString?.() || row.paid_at,
+    notes: row.notes,
+  };
+}
+
+export function mapUser(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    permissions: row.permissions || [],
+    status: row.status,
+    lastLogin: row.last_login?.toISOString?.() || row.last_login,
+    customerId: row.customer_id,
+  };
+}
+
+export function mapProduct(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    categoryId: row.category_id,
+    price: Number(row.price),
+    sku: row.sku,
+    status: row.status,
+    imageUrl: row.image_url,
+    stockQty: Number(row.stock_qty),
+    description: row.description,
+  };
+}
+
+export function mapCategory(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    parentCategoryId: row.parent_category_id,
+  };
+}
+
+export function mapNotification(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    userId: row.user_id,
+    type: row.type,
+    message: row.message,
+    isRead: row.is_read,
+    createdAt: row.created_at?.toISOString?.() || row.created_at,
+    relatedEntityId: row.related_entity_id,
+  };
+}
+
+export function mapAudit(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    userId: row.user_id,
+    action: row.action,
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    timestamp: row.timestamp?.toISOString?.() || row.timestamp,
+    details: row.details,
+  };
+}
