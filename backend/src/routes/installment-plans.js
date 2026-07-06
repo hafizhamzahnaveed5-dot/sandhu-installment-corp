@@ -2,7 +2,8 @@ import express from 'express';
 import { pool, withTransaction } from '../db.js';
 import { authenticate, customerOwns, requireMinRole } from '../middleware/auth.js';
 import { writeAudit } from '../services/audit.js';
-import { mapPlan, mapSchedule } from '../services/mappers.js';
+import { mapPayment, mapPlan, mapSchedule } from '../services/mappers.js';
+import { calculateSettlementBreakdown, performEarlySettlement } from '../services/settlement.js';
 import { asyncHandler, fail, ok, pagination, paginationParams } from '../utils/respond.js';
 import { newId } from '../utils/ids.js';
 
@@ -147,6 +148,79 @@ router.get('/:id/schedule', asyncHandler(async (req, res) => {
     [req.params.id]
   );
   return ok(res, result.rows.map(mapSchedule));
+}));
+
+/**
+ * GET /api/installment-plans/:id/settlement-preview
+ * Returns the breakdown a staff member sees before confirming early settlement.
+ * Accessible to managers and above (agents cannot initiate settlements).
+ */
+router.get('/:id/settlement-preview', requireMinRole('manager'), asyncHandler(async (req, res) => {
+  const access = await ensurePlanAccess(req, req.params.id);
+  if (!access.found) return fail(res, 404, 'Plan not found.');
+  if (!access.allowed) return fail(res, 403, 'Access denied.');
+
+  const planResult = await pool.query('SELECT * FROM installment_plans WHERE id = $1', [req.params.id]);
+  const plan = planResult.rows[0];
+  if (plan.status === 'completed') return fail(res, 400, 'Plan is already completed.');
+
+  // Use a single connection (not a transaction) for the read-only preview
+  const client = await pool.connect();
+  try {
+    const breakdown = await calculateSettlementBreakdown(client, req.params.id);
+    return ok(res, breakdown);
+  } finally {
+    client.release();
+  }
+}));
+
+/**
+ * POST /api/installment-plans/:id/settle
+ * Execute a dedicated early settlement: one consolidated payment, all rows closed, plan completed.
+ * Body: { method: 'cash'|'bank'|'online', notes?: string }
+ */
+router.post('/:id/settle', requireMinRole('manager'), asyncHandler(async (req, res) => {
+  const { method, notes } = req.body || {};
+  if (!method) return fail(res, 400, 'Payment method is required.');
+  if (!['cash', 'bank', 'online'].includes(method)) return fail(res, 400, 'Invalid payment method.');
+
+  const access = await ensurePlanAccess(req, req.params.id);
+  if (!access.found) return fail(res, 404, 'Plan not found.');
+
+  const planResult = await pool.query(
+    'SELECT * FROM installment_plans WHERE id = $1',
+    [req.params.id]
+  );
+  const plan = planResult.rows[0];
+  if (plan.status === 'completed') return fail(res, 400, 'Plan is already completed.');
+  if (plan.status === 'cancelled') return fail(res, 400, 'Cannot settle a cancelled plan.');
+
+  const payment = await withTransaction(async (client) => {
+    // Re-calculate inside the transaction to prevent race conditions
+    const breakdown = await calculateSettlementBreakdown(client, req.params.id);
+
+    if (!breakdown.hasOpenRows) {
+      throw Object.assign(new Error('All installments are already paid — nothing to settle.'), { status: 400 });
+    }
+
+    const result = await performEarlySettlement(client, {
+      planId: req.params.id,
+      customerId: plan.customer_id,
+      amount: breakdown.settlementAmount,
+      method,
+      userId: req.user.id,
+      notes,
+      breakdown,
+    });
+
+    return result;
+  }).catch((err) => {
+    if (err.status) return err;
+    throw err;
+  });
+
+  if (payment instanceof Error) return fail(res, payment.status, payment.message);
+  return ok(res, mapPayment(payment));
 }));
 
 export default router;

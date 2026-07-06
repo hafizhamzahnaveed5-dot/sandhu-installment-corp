@@ -256,6 +256,104 @@ const InstallmentsService = {
     }
     return api.get('/reports/today-due');
   },
+
+  /**
+   * Get a live breakdown of what it would cost to settle a plan early right now.
+   * Returns: { remainingPrincipal, markupEarnedToDate, markupToWaive, settlementAmount, asOfDate }
+   */
+  async getSettlementPreview(planId) {
+    if (Config.FEATURE_FLAGS.MOCK_MODE) {
+      await delay(400);
+      const plan = mockPlans.find(p => p.id === planId);
+      if (!plan) return { success: false, data: null, error: 'Plan not found.' };
+
+      const schedules = mockSchedule.filter(s => s.planId === planId);
+      const today = new Date().toISOString().slice(0, 10);
+      const open = schedules.filter(s => s.status !== 'paid' && s.status !== 'settled');
+
+      const remainingPrincipal = open.reduce(
+        (sum, s) => sum + Math.max(0, (s.principalDue || 0) - (s.principalPaid || 0)), 0
+      );
+      const markupEarnedToDate = open
+        .filter(s => s.dueDate <= today)
+        .reduce((sum, s) => sum + (s.markupAmount || 0), 0);
+      const markupToWaive = open
+        .filter(s => s.dueDate > today)
+        .reduce((sum, s) => sum + (s.markupAmount || 0), 0);
+
+      return {
+        success: true,
+        data: {
+          planId,
+          asOfDate: today,
+          remainingPrincipal: +remainingPrincipal.toFixed(2),
+          markupEarnedToDate: +markupEarnedToDate.toFixed(2),
+          markupToWaive: +markupToWaive.toFixed(2),
+          settlementAmount: +(remainingPrincipal + markupEarnedToDate).toFixed(2),
+          hasOpenRows: open.length > 0,
+          openRowCount: open.length,
+        },
+        error: null,
+      };
+    }
+    return api.get(`/installment-plans/${planId}/settlement-preview`);
+  },
+
+  /**
+   * Execute early settlement — one consolidated payment, all rows closed.
+   * @param {string} planId
+   * @param {{ method: string, notes?: string }} opts
+   */
+  async settleEarly(planId, { method, notes = '' } = {}) {
+    if (Config.FEATURE_FLAGS.MOCK_MODE) {
+      await delay(600);
+      const planIdx = mockPlans.findIndex(p => p.id === planId);
+      if (planIdx === -1) return { success: false, data: null, error: 'Plan not found.' };
+
+      const plan = mockPlans[planIdx];
+      if (plan.status === 'completed') return { success: false, data: null, error: 'Plan is already completed.' };
+
+      const preview = await this.getSettlementPreview(planId);
+      if (!preview.success) return preview;
+      const b = preview.data;
+
+      const today = new Date().toISOString().slice(0, 10);
+
+      // Close all open schedule rows
+      mockSchedule.forEach((s, i) => {
+        if (s.planId !== planId) return;
+        if (s.status === 'paid' || s.status === 'settled') return;
+        if (s.dueDate > today) {
+          mockSchedule[i] = { ...s, status: 'settled', markupWaived: s.markupAmount || 0, markupEarned: 0, amountDue: s.principalDue, amountPaid: s.principalDue, paidDate: today, closedReason: 'early-settlement' };
+        } else {
+          mockSchedule[i] = { ...s, status: 'paid', markupEarned: s.markupAmount || 0, amountPaid: s.amountDue, paidDate: today, closedReason: 'early-settlement-paid-through-date' };
+        }
+      });
+
+      // Mark plan completed
+      mockPlans[planIdx] = { ...plan, status: 'completed', outstandingBalance: 0, markupWaived: b.markupToWaive, settledEarlyAt: new Date().toISOString() };
+
+      const payment = {
+        id: `pay-settle-${Date.now()}`,
+        planId,
+        scheduleId: null,
+        amount: b.settlementAmount,
+        method,
+        notes,
+        isEarlySettlement: true,
+        markupWaived: b.markupToWaive,
+        receiptNumber: `RCP-${new Date().getFullYear()}-SETTLE`,
+        paidAt: new Date().toISOString(),
+        status: 'posted',
+      };
+      mockPayments.push(payment);
+
+      await AuditService.log('UPDATE', 'InstallmentPlan', planId, `Plan settled early: PKR ${b.settlementAmount}; markup waived PKR ${b.markupToWaive}`);
+      EventBus.emit('payment:recorded', payment);
+      return { success: true, data: payment, error: null };
+    }
+    return api.post(`/installment-plans/${planId}/settle`, { method, notes });
+  },
 };
 
 export default InstallmentsService;
