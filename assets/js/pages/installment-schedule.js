@@ -44,7 +44,7 @@ export default async function init({ param }) {
         .reduce((sum, s) => sum + Math.max(0, s.amountDue - s.amountPaid), 0);
 
   // Can the current user initiate a settlement? (manager+)
-  const canSettle = AuthService.hasRole('manager') && (plan.status === 'active' || plan.status === 'overdue');
+  const canSettle = AuthService.hasMinRole('manager') && (plan.status === 'active' || plan.status === 'overdue') && remainingDisplay > 0;
 
   // Early-settlement banner (already settled)
   const earlyBanner = plan.settledEarlyAt ? `
