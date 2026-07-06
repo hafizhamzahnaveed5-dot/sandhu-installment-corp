@@ -24,10 +24,17 @@ router.get('/', asyncHandler(async (req, res) => {
 }));
 
 router.post('/', asyncHandler(async (req, res) => {
-  const { name, email, password, role = 'agent', customerId = null } = req.body || {};
+  const { name, email, password, role = 'agent' } = req.body || {};
+  let customerId = req.body.customerId || null;
+
   if (!name || !email || !password) return fail(res, 400, 'name, email, and password are required.');
   if (!['admin', 'manager', 'agent', 'customer'].includes(role)) return fail(res, 400, 'Invalid user role.');
-  if (role === 'customer' && !customerId) return fail(res, 400, 'customerId is required for customer users.');
+  
+  if (role !== 'customer') {
+    customerId = null;
+  } else if (!customerId) {
+    return fail(res, 400, 'customerId is required for customer users.');
+  }
 
   const id = newId('user');
   const passwordHash = await bcrypt.hash(password, 12);

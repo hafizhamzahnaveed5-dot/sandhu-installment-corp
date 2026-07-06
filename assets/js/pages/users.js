@@ -297,9 +297,12 @@ async function openCreateModal() {
     const btn = modal.backdrop.querySelector('#cu-submit');
     btn.classList.add('loading');
 
-    console.log('Submitting customerId:', customerId);
+    const payload = { name, email, role, password };
+    if (role === 'customer') {
+      payload.customerId = customerId;
+    }
 
-    const result = await AuthService.createUser({ name, email, role, password, customerId });
+    const result = await AuthService.createUser(payload);
 
     btn.classList.remove('loading');
 
