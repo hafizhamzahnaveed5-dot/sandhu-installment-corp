@@ -125,6 +125,7 @@ export default async function init({ param }) {
           <h4 style="margin-bottom:16px">Contact Information</h4>
           <div class="info-row"><span class="info-label">Full Name</span><span class="info-value">${c.fullName}</span></div>
           <div class="info-row"><span class="info-label">Phone</span><span class="info-value mono">${c.phone}</span></div>
+          <div class="info-row"><span class="info-label">SMS Alerts</span><span class="info-value"><span class="badge ${c.smsAlertsEnabled === false ? 'badge-inactive' : 'badge-paid'} badge-nodot">${c.smsAlertsEnabled === false ? 'Disabled' : 'Enabled'}</span></span></div>
           <div class="info-row"><span class="info-label">Email</span><span class="info-value">${c.email || '—'}</span></div>
           <div class="info-row"><span class="info-label">CNIC / ID</span><span class="info-value mono">••••-•••••••-•</span></div>
           <div class="info-row"><span class="info-label">Address</span><span class="info-value" style="text-align:right">${c.address || '—'}</span></div>

@@ -1,13 +1,31 @@
 import express from 'express';
 import { pool, withTransaction } from '../db.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, requireMinRole } from '../middleware/auth.js';
 import { writeAudit } from '../services/audit.js';
-import { mapNotification } from '../services/mappers.js';
+import { mapNotification, mapSmsLog } from '../services/mappers.js';
+import { runDueSmsSweep } from '../services/sms.js';
 import { asyncHandler, fail, ok } from '../utils/respond.js';
 
 const router = express.Router();
 
 router.use(authenticate);
+
+router.get('/sms-log', requireMinRole('manager'), asyncHandler(async (_req, res) => {
+  const result = await pool.query(
+    `SELECT l.*, c.full_name AS customer_name
+     FROM sms_notifications_log l
+     LEFT JOIN customers c ON c.id = l.customer_id
+     ORDER BY l.created_at DESC
+     LIMIT 100`
+  );
+  return ok(res, result.rows.map(mapSmsLog));
+}));
+
+router.post('/sms-sweep', requireMinRole('manager'), asyncHandler(async (req, res) => {
+  const summary = await runDueSmsSweep({ dueSoonDays: Number(req.body?.dueSoonDays || 2) });
+  await writeAudit(pool, req.user.id, 'SYSTEM', 'SMS', 'due-sweep', `Manual SMS sweep: ${summary.sent} sent, ${summary.failed} failed`);
+  return ok(res, summary);
+}));
 
 router.get('/', asyncHandler(async (req, res) => {
   const requestedUserId = req.query.userId || req.user.id;

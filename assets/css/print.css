@@ -115,6 +115,19 @@
     margin: 0 !important;
     padding: 24pt !important;
     page-break-inside: avoid;
+    position: relative !important;
+    isolation: isolate !important;
+    overflow: hidden !important;
+  }
+
+  .receipt-card > * {
+    position: relative !important;
+    z-index: 1 !important;
+    background: transparent !important;
+  }
+
+  .receipt-card * {
+    background: transparent !important;
   }
 
   /* ── 7. Receipt header ── */
@@ -209,17 +222,21 @@
     page-break-inside: avoid;
   }
 
-  /* ── 16. PAID watermark — print it as visible bold text ── */
+  /* ── 16. PAID watermark — behind text, light enough for legibility ── */
   .receipt-card::after {
     content: 'PAID';
     position: absolute;
     top: 50%;
     left: 50%;
+    z-index: 0;
     transform: translate(-50%, -50%) rotate(-30deg);
     font-size: 72pt;
     font-weight: 900;
-    color: rgba(0,0,0,0.06) !important;
+    line-height: 1;
+    color: rgba(0,0,0,0.1) !important;
+    background: transparent !important;
     letter-spacing: 8px;
+    opacity: 1 !important;
     pointer-events: none;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;

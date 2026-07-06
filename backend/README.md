@@ -21,9 +21,15 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/sandhu_installments
 JWT_SECRET=replace-with-a-long-random-secret
 FRONTEND_ORIGIN=http://localhost:8000
 PORT=3000
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=replace-with-twilio-auth-token
+TWILIO_PHONE_NUMBER=+1xxxxxxxxxx
+ENABLE_SMS_SCHEDULER=true
 ```
 
 Secrets must come from environment variables. Do not hardcode production database URLs or JWT secrets.
+
+Twilio variables are required for real SMS delivery. If they are missing, payment and due/overdue actions still succeed, but the SMS attempt is logged as `failed` in `sms_notifications_log`.
 
 `FRONTEND_ORIGIN` controls CORS. Use the deployed frontend domain in production, for example:
 
@@ -133,6 +139,8 @@ Implemented routes:
 - `GET /api/reports/collections`
 - `GET /api/reports/today-due`
 - `GET /api/notifications`
+- `GET /api/notifications/sms-log`
+- `POST /api/notifications/sms-sweep`
 - `PATCH /api/notifications/:id`
 - `POST /api/notifications/mark-all-read`
 - `GET /api/audit-logs`
@@ -149,3 +157,18 @@ Implemented routes:
 - Customers with active installment plans cannot be deleted.
 - Create, update, delete, login, and payment actions write audit logs.
 - Recording a payment runs in one PostgreSQL transaction: insert payment, update schedule, recalculate plan balance, and update customer outstanding total.
+- Payment confirmation SMS is attempted after the payment transaction commits. SMS failure never rolls back the payment.
+
+## SMS Alerts
+
+SMS alerts are customer opt-in/out via `customers.sms_alerts_enabled`.
+
+Implemented SMS events:
+
+- Payment confirmation after `POST /api/payments`
+- Due-soon reminders for unpaid installments due in the next 2 days
+- Overdue reminders for unpaid installments with a past due date
+
+The backend starts an in-process daily scheduler by default. Set `ENABLE_SMS_SCHEDULER=false` to disable it and use an external scheduler instead. For Railway, the safer production setup is a Railway Cron Job that calls `POST /api/notifications/sms-sweep` once daily with an admin/manager token, especially if the API is scaled to multiple instances. The in-process scheduler is simpler, but multiple running app instances can each run the sweep.
+
+Every SMS attempt is logged in `sms_notifications_log` with recipient, message, alert type, status, timestamp, provider response ID, and error text where applicable.

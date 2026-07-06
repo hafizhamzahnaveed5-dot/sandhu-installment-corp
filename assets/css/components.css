@@ -900,3 +900,28 @@ select.form-control option { background: var(--color-bg-elevated); color: var(--
     background: var(--color-bg-overlay);
   }
 }
+
+.receipt-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.receipt-card > * {
+  position: relative;
+  z-index: 1;
+}
+.receipt-card::after {
+  content: 'PAID';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 0;
+  transform: translate(-50%, -50%) rotate(-30deg);
+  font-size: 72pt;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--color-accent-green);
+  letter-spacing: 8px;
+  opacity: 0.1;
+  pointer-events: none;
+}

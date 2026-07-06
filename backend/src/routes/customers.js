@@ -64,19 +64,20 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
     documents: req.body.documents || [],
     creditScore: req.body.creditScore || 0,
     totalOutstanding: req.body.totalOutstanding || 0,
+    smsAlertsEnabled: req.body.smsAlertsEnabled ?? true,
     notes: req.body.notes || null,
   };
 
   const row = await withTransaction(async (client) => {
     const inserted = await client.query(
       `INSERT INTO customers
-       (id, full_name, cnic_or_id, phone, email, address, city, status, guarantor_name, guarantor_phone, documents, credit_score, total_outstanding, notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+       (id, full_name, cnic_or_id, phone, email, address, city, status, guarantor_name, guarantor_phone, documents, credit_score, total_outstanding, sms_alerts_enabled, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        RETURNING *`,
       [
         customer.id, customer.fullName, customer.cnicOrId, customer.phone, customer.email, customer.address,
         customer.city, customer.status, customer.guarantorName, customer.guarantorPhone,
-        JSON.stringify(customer.documents), customer.creditScore, customer.totalOutstanding, customer.notes,
+        JSON.stringify(customer.documents), customer.creditScore, customer.totalOutstanding, customer.smsAlertsEnabled, customer.notes,
       ]
     );
     await writeAudit(client, req.user.id, 'CREATE', 'Customer', customer.id, `Created customer: ${customer.fullName}`);
@@ -96,12 +97,13 @@ router.put('/:id', requireMinRole('manager'), asyncHandler(async (req, res) => {
       `UPDATE customers SET
         full_name=$2, cnic_or_id=$3, phone=$4, email=$5, address=$6, city=$7, status=$8,
         guarantor_name=$9, guarantor_phone=$10, documents=$11, credit_score=$12,
-        total_outstanding=$13, notes=$14, updated_at=now()
+        total_outstanding=$13, sms_alerts_enabled=$14, notes=$15, updated_at=now()
        WHERE id=$1 RETURNING *`,
       [
         req.params.id, source.fullName, source.cnicOrId, source.phone, source.email, source.address,
         source.city, source.status, source.guarantorName, source.guarantorPhone,
-        JSON.stringify(source.documents || []), source.creditScore || 0, source.totalOutstanding || 0, source.notes,
+        JSON.stringify(source.documents || []), source.creditScore || 0, source.totalOutstanding || 0,
+        source.smsAlertsEnabled ?? true, source.notes,
       ]
     );
     await writeAudit(client, req.user.id, 'UPDATE', 'Customer', req.params.id, `Updated customer: ${source.fullName}`);

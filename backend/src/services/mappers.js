@@ -15,6 +15,7 @@ export function mapCustomer(row) {
     documents: row.documents || [],
     creditScore: Number(row.credit_score || 0),
     totalOutstanding: Number(row.total_outstanding || 0),
+    smsAlertsEnabled: row.sms_alerts_enabled ?? true,
     notes: row.notes,
   };
 }
@@ -67,6 +68,7 @@ export function mapPayment(row) {
     receiptNumber: row.receipt_number,
     paidAt: row.paid_at?.toISOString?.() || row.paid_at,
     notes: row.notes,
+    smsStatus: row.sms_status || null,
   };
 }
 
@@ -131,5 +133,24 @@ export function mapAudit(row) {
     entityId: row.entity_id,
     timestamp: row.timestamp?.toISOString?.() || row.timestamp,
     details: row.details,
+  };
+}
+
+export function mapSmsLog(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    customerId: row.customer_id,
+    customerName: row.customer_name,
+    phone: row.phone,
+    message: row.message,
+    alertType: row.alert_type,
+    referenceType: row.reference_type,
+    referenceId: row.reference_id,
+    status: row.status,
+    provider: row.provider,
+    providerMessageId: row.provider_message_id,
+    error: row.error,
+    createdAt: row.created_at?.toISOString?.() || row.created_at,
   };
 }

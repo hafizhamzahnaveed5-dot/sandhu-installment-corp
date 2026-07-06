@@ -10,7 +10,7 @@
 
 import { renderNavbar } from '../components/navbar.js';
 import InstallmentsService from '../services/installments.service.js';
-import { formatCurrency, formatDate } from '../config.js';
+import { Config, formatCurrency, formatDate } from '../config.js';
 import { BarChart } from '../components/chart.js';
 import EventBus from '../components/event-bus.js';
 import AuthService from '../services/auth.service.js';
@@ -44,6 +44,9 @@ export default async function init() {
 
 // ── Shell HTML ────────────────────────────────────────────────────────────────
 function renderShell(user) {
+  const modeLabel = Config.FEATURE_FLAGS.MOCK_MODE ? 'Mock / Demo' : 'Live / Production';
+  const modeClass = Config.FEATURE_FLAGS.MOCK_MODE ? 'badge-pending' : 'badge-paid';
+
   return `
     <div class="page-header">
       <div class="page-header-left">
@@ -104,7 +107,7 @@ function renderShell(user) {
           <div style="display:flex;flex-direction:column;gap:var(--space-3)">
             <div class="info-row">
               <span class="info-label">Mode</span>
-              <span class="badge badge-paid badge-nodot">Mock / Demo</span>
+              <span class="badge ${modeClass} badge-nodot">${modeLabel}</span>
             </div>
             <div class="info-row">
               <span class="info-label">Logged in as</span>

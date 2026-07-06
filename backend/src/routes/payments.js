@@ -3,6 +3,7 @@ import { pool, withTransaction } from '../db.js';
 import { authenticate, customerOwns, requireMinRole } from '../middleware/auth.js';
 import { writeAudit } from '../services/audit.js';
 import { mapCustomer, mapPayment, mapPlan } from '../services/mappers.js';
+import { sendPaymentConfirmation } from '../services/sms.js';
 import { newId, receiptNumber } from '../utils/ids.js';
 import { asyncHandler, fail, ok, pagination, paginationParams } from '../utils/respond.js';
 
@@ -89,6 +90,9 @@ router.post('/', requireMinRole('agent'), asyncHandler(async (req, res) => {
   });
 
   if (payment instanceof Error) return fail(res, payment.status, payment.message);
+  sendPaymentConfirmation(payment).catch((error) => {
+    console.error('[sms] payment confirmation failed:', error);
+  });
   return ok(res, mapPayment(payment));
 }));
 
@@ -99,25 +103,39 @@ router.get('/', asyncHandler(async (req, res) => {
 
   if (req.user.role === 'customer') {
     values.push(req.user.customerId);
-    where.push(`customer_id = $${values.length}`);
+    where.push(`p.customer_id = $${values.length}`);
   }
   if (req.query.planId) {
     values.push(req.query.planId);
-    where.push(`plan_id = $${values.length}`);
+    where.push(`p.plan_id = $${values.length}`);
   }
   if (req.query.dateFrom) {
     values.push(req.query.dateFrom);
-    where.push(`paid_at >= $${values.length}`);
+    where.push(`p.paid_at >= $${values.length}`);
   }
   if (req.query.dateTo) {
     values.push(req.query.dateTo);
-    where.push(`paid_at <= $${values.length}`);
+    where.push(`p.paid_at <= $${values.length}`);
   }
 
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-  const count = await pool.query(`SELECT count(*)::int AS total FROM payments ${whereSql}`, values);
+  const count = await pool.query(`SELECT count(*)::int AS total FROM payments p ${whereSql}`, values);
   const result = await pool.query(
-    `SELECT * FROM payments ${whereSql} ORDER BY paid_at DESC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
+    `SELECT p.*,
+       latest_sms.status AS sms_status
+     FROM payments p
+     LEFT JOIN LATERAL (
+       SELECT status
+       FROM sms_notifications_log l
+       WHERE l.reference_type = 'payment'
+         AND l.reference_id = p.id
+         AND l.alert_type = 'payment-confirmation'
+       ORDER BY l.created_at DESC
+       LIMIT 1
+     ) latest_sms ON true
+     ${whereSql}
+     ORDER BY p.paid_at DESC
+     LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
     [...values, pageSize, offset]
   );
 
@@ -125,7 +143,22 @@ router.get('/', asyncHandler(async (req, res) => {
 }));
 
 router.get('/:id', asyncHandler(async (req, res) => {
-  const result = await pool.query('SELECT * FROM payments WHERE id = $1', [req.params.id]);
+  const result = await pool.query(
+    `SELECT p.*,
+       latest_sms.status AS sms_status
+     FROM payments p
+     LEFT JOIN LATERAL (
+       SELECT status
+       FROM sms_notifications_log l
+       WHERE l.reference_type = 'payment'
+         AND l.reference_id = p.id
+         AND l.alert_type = 'payment-confirmation'
+       ORDER BY l.created_at DESC
+       LIMIT 1
+     ) latest_sms ON true
+     WHERE p.id = $1`,
+    [req.params.id]
+  );
   if (!result.rowCount) return fail(res, 404, 'Payment not found.');
   const payment = result.rows[0];
   if (!customerOwns(payment.customer_id, req)) return fail(res, 403, 'Customers can only access their own payments.');

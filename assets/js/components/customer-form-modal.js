@@ -28,6 +28,7 @@ function getPayload(modal) {
     guarantorPhone: modal.backdrop.querySelector('#c-guarantorPhone').value.trim(),
     notes:          modal.backdrop.querySelector('#c-notes').value.trim(),
     creditScore:    Number(modal.backdrop.querySelector('#c-creditScore')?.value || 0),
+    smsAlertsEnabled: modal.backdrop.querySelector('#c-smsAlertsEnabled')?.checked ?? true,
   };
 }
 
@@ -84,6 +85,15 @@ export function openCustomerFormModal({ mode = 'add', customer = null, onSaved =
       <div class="form-group full-width">
         <label class="form-label">Notes</label>
         <textarea id="c-notes" class="form-control" rows="2" placeholder="Any notes about this customer...">${escapeAttr(customer?.notes || '')}</textarea>
+      </div>
+      <div class="form-group full-width">
+        <label class="checkbox-group" style="min-height:44px">
+          <input type="checkbox" id="c-smsAlertsEnabled" ${customer?.smsAlertsEnabled === false ? '' : 'checked'}/>
+          <span>
+            <span style="display:block;font-size:14px;color:var(--color-text-primary);font-weight:500">SMS alerts enabled</span>
+            <span style="display:block;font-size:12px;color:var(--color-text-tertiary)">Send due, overdue, and payment confirmation texts to this customer.</span>
+          </span>
+        </label>
       </div>
       ${canDelete ? `
         <div class="form-group full-width" style="border-top:1px solid var(--color-border);padding-top:var(--space-4)">

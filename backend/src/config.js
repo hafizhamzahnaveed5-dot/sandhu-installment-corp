@@ -8,6 +8,12 @@ export const config = {
   jwtSecret: process.env.JWT_SECRET,
   frontendOrigin: process.env.FRONTEND_ORIGIN || 'http://localhost:8000',
   nodeEnv: process.env.NODE_ENV || 'development',
+  smsSchedulerEnabled: process.env.ENABLE_SMS_SCHEDULER !== 'false',
+  twilio: {
+    accountSid: process.env.TWILIO_ACCOUNT_SID,
+    authToken: process.env.TWILIO_AUTH_TOKEN,
+    phoneNumber: process.env.TWILIO_PHONE_NUMBER,
+  },
 };
 
 export function requireConfig() {

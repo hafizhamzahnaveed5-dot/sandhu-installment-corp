@@ -62,12 +62,13 @@ export default async function init() {
               <th>Plan ID</th>
               <th>Amount</th>
               <th>Method</th>
+              <th>SMS</th>
               <th>Paid At</th>
               <th style="text-align:right">Action</th>
             </tr>
           </thead>
           <tbody id="payments-tbody">
-            <tr><td colspan="6"><div class="skeleton skeleton-text" style="height:120px"></div></td></tr>
+            <tr><td colspan="7"><div class="skeleton skeleton-text" style="height:120px"></div></td></tr>
           </tbody>
         </table>
       </div>
@@ -111,7 +112,7 @@ function renderTable(payments) {
 
   if (!payments.length) {
     tbody.innerHTML = `
-      <tr><td colspan="6">
+      <tr><td colspan="7">
         <div class="empty-state" style="padding:48px">
           <span style="font-size:48px">💳</span>
           <h3>No transactions found</h3>
@@ -131,6 +132,7 @@ function renderTable(payments) {
       <td class="mono">${p.planId}</td>
       <td style="font-weight:700;color:var(--color-accent-green);font-family:var(--font-mono)">${formatCurrency(p.amount)}</td>
       <td><span class="badge badge-info badge-nodot">${p.method.toUpperCase()}</span></td>
+      <td>${renderSmsBadge(p.smsStatus)}</td>
       <td class="secondary">${formatDate(p.paidAt)}</td>
       <td style="text-align:right">
         <a href="#/payments/${p.id}" class="btn btn-sm btn-ghost" onclick="event.stopPropagation()">
@@ -143,4 +145,11 @@ function renderTable(payments) {
   if (footer) {
     footer.innerHTML = `${payments.length} transaction${payments.length !== 1 ? 's' : ''} &nbsp;·&nbsp; Total: <strong>${formatCurrency(total)}</strong>`;
   }
+}
+
+function renderSmsBadge(status) {
+  if (status === 'sent') return '<span class="badge badge-paid badge-nodot">SMS sent</span>';
+  if (status === 'failed') return '<span class="badge badge-danger badge-nodot">SMS failed</span>';
+  if (status === 'skipped') return '<span class="badge badge-inactive badge-nodot">SMS off</span>';
+  return '<span class="badge badge-inactive badge-nodot">Pending</span>';
 }
