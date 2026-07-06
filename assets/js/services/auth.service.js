@@ -141,6 +141,12 @@ const AuthService = {
       const existing = MOCK_USERS.find(u => u.email === payload.email);
       if (existing) return { success: false, data: null, error: 'Email already exists.' };
 
+      if (payload.role === 'customer') {
+        if (!payload.customerId) return { success: false, data: null, error: 'customerId is required for customer users.' };
+        const existingCustomerUser = MOCK_USERS.find(u => u.customerId === payload.customerId);
+        if (existingCustomerUser) return { success: false, data: null, error: 'This customer already has a linked user account.' };
+      }
+
       const permMap = {
         admin:    ['*'],
         manager:  ['customers.read','customers.write','installments.*','payments.*','reports.read'],
@@ -157,6 +163,10 @@ const AuthService = {
         password: payload.password || 'changeme123',
         lastLogin: null,
       };
+      if (payload.role === 'customer') {
+        newUser.customerId = payload.customerId;
+      }
+      
       MOCK_USERS.push(newUser);
       return { success: true, data: newUser, error: null };
     }

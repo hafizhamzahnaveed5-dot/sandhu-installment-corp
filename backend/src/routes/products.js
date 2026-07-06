@@ -71,7 +71,39 @@ router.put('/:id', requireMinRole('manager'), asyncHandler(async (req, res) => {
   return ok(res, mapProduct(row));
 }));
 
+router.patch('/:id/stock', requireMinRole('manager'), asyncHandler(async (req, res) => {
+  const { stockQty } = req.body;
+  if (stockQty === undefined || typeof stockQty !== 'number' || stockQty < 0) {
+    return fail(res, 400, 'Valid stockQty is required.');
+  }
+  
+  const existing = await pool.query('SELECT name, stock_qty FROM products WHERE id = $1', [req.params.id]);
+  if (!existing.rowCount) return fail(res, 404, 'Product not found.');
+  
+  const oldStock = existing.rows[0].stock_qty;
+  const row = await withTransaction(async (client) => {
+    const updated = await client.query(
+      'UPDATE products SET stock_qty = $2, updated_at = now() WHERE id = $1 RETURNING *',
+      [req.params.id, stockQty]
+    );
+    await writeAudit(client, req.user.id, 'UPDATE', 'Product', req.params.id, `Stock quantity changed from ${oldStock} to ${stockQty}`);
+    return updated.rows[0];
+  });
+  return ok(res, mapProduct(row));
+}));
+
 router.delete('/:id', requireMinRole('manager'), asyncHandler(async (req, res) => {
+  // Check if product is linked to any active/pending/due-soon/overdue plans
+  const linkedPlans = await pool.query(
+    `SELECT id FROM installment_plans 
+     WHERE product_id = $1 AND status IN ('active', 'overdue', 'due-soon', 'pending')
+     LIMIT 1`,
+    [req.params.id]
+  );
+  if (linkedPlans.rowCount > 0) {
+    return fail(res, 400, 'This product is linked to active installment plans and cannot be deleted.');
+  }
+
   const row = await withTransaction(async (client) => {
     const deleted = await client.query('DELETE FROM products WHERE id = $1 RETURNING *', [req.params.id]);
     if (!deleted.rowCount) return null;

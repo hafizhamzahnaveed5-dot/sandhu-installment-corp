@@ -43,7 +43,16 @@ router.post('/', asyncHandler(async (req, res) => {
     await writeAudit(client, req.user.id, 'CREATE', 'User', id, `Created user: ${email}`);
     return inserted.rows[0];
   }).catch((error) => {
-    if (error.code === '23505') return Object.assign(new Error('Email already exists.'), { status: 409 });
+    if (error.code === '23505') {
+      if (error.constraint === 'users_email_key' || error.constraint === 'users_email_unique') {
+        return Object.assign(new Error('Email already exists.'), { status: 409 });
+      }
+      if (error.constraint === 'idx_users_customer_id_unique') {
+        return Object.assign(new Error('This customer already has a linked user account.'), { status: 400 });
+      }
+      // generic fallback for other unique violations
+      return Object.assign(new Error('A unique constraint violation occurred.'), { status: 409 });
+    }
     if (error.code === '23503') return Object.assign(new Error('Referenced customer does not exist.'), { status: 400 });
     throw error;
   });

@@ -11,6 +11,7 @@ import Modal from '../components/modal.js';
 import Toast from '../components/toast.js';
 import { attachSearch } from '../components/search.js';
 import { formatDate, getInitials } from '../config.js';
+import CustomersService from '../services/customers.service.js';
 
 let _allUsers = [];
 let _searchHandle = null;
@@ -185,7 +186,10 @@ function renderTable(users) {
 }
 
 // ── Create User Modal ─────────────────────────────────────────────────────────
-function openCreateModal() {
+async function openCreateModal() {
+  const customersRes = await CustomersService.list({ pageSize: 1000 });
+  const customersList = customersRes.success ? customersRes.data : [];
+
   const formHtml = `
     <div class="form-grid">
       <div class="form-group full-width">
@@ -209,6 +213,16 @@ function openCreateModal() {
         <label class="form-label" for="cu-password">Temporary Password <span class="required">*</span></label>
         <input type="text" id="cu-password" class="form-control" placeholder="min 8 characters" value="changeme123">
         <span class="form-help">User should change this on first login.</span>
+      </div>
+
+      <!-- Linked Customer (Hidden by default) -->
+      <div class="form-group full-width" id="cu-customer-group" style="display:none">
+        <label class="form-label" for="cu-customer">Linked Customer Record <span class="required">*</span></label>
+        <select id="cu-customer" class="form-control">
+          <option value="">-- Select a Customer --</option>
+          ${customersList.map(c => `<option value="${c.id}">${c.fullName} (${c.phone})</option>`).join('')}
+        </select>
+        <span class="form-help">Required for customer accounts to link their dashboard data.</span>
       </div>
 
       <!-- Role description box -->
@@ -240,8 +254,19 @@ function openCreateModal() {
   };
 
   modal.backdrop.querySelector('#cu-role')?.addEventListener('change', e => {
+    const role = e.target.value;
     const desc = document.getElementById('role-desc-text');
-    if (desc) desc.textContent = ROLE_DESC[e.target.value] || '';
+    if (desc) desc.textContent = ROLE_DESC[role] || '';
+
+    const customerGroup = document.getElementById('cu-customer-group');
+    if (customerGroup) {
+      if (role === 'customer') {
+        customerGroup.style.display = 'block';
+      } else {
+        customerGroup.style.display = 'none';
+        modal.backdrop.querySelector('#cu-customer').value = '';
+      }
+    }
   });
 
   modal.backdrop.querySelector('#cu-cancel')?.addEventListener('click', modal.destroy);
@@ -251,15 +276,21 @@ function openCreateModal() {
     const email    = modal.backdrop.querySelector('#cu-email')?.value?.trim();
     const role     = modal.backdrop.querySelector('#cu-role')?.value;
     const password = modal.backdrop.querySelector('#cu-password')?.value?.trim();
+    const customerId = modal.backdrop.querySelector('#cu-customer')?.value;
 
     if (!name)  { Toast.warning('Validation', 'Name is required.'); return; }
     if (!email) { Toast.warning('Validation', 'Email is required.'); return; }
     if (!password || password.length < 8) { Toast.warning('Validation', 'Password must be at least 8 characters.'); return; }
+    
+    if (role === 'customer' && !customerId) {
+      Toast.warning('Validation', 'A linked customer record is required for Customer roles.');
+      return;
+    }
 
     const btn = modal.backdrop.querySelector('#cu-submit');
     btn.classList.add('loading');
 
-    const result = await AuthService.createUser({ name, email, role, password });
+    const result = await AuthService.createUser({ name, email, role, password, customerId });
 
     btn.classList.remove('loading');
 
