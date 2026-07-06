@@ -361,7 +361,7 @@ function openEditModal(user) {
 
   // Handle Delete
   modal.backdrop.querySelector('#eu-delete')?.addEventListener('click', async () => {
-    if (!confirm(\`Are you sure you want to delete \${user.name} (\${user.email})? This action cannot be undone.\`)) return;
+    if (!confirm(`Are you sure you want to delete ${user.name} (${user.email})? This action cannot be undone.`)) return;
     
     const btn = modal.backdrop.querySelector('#eu-delete');
     btn.classList.add('loading');
@@ -369,7 +369,7 @@ function openEditModal(user) {
     const result = await AuthService.deleteUser(user.id);
     
     if (result.success) {
-      Toast.success('User Deleted', \`\${user.name} has been removed.\`);
+      Toast.success('User Deleted', `${user.name} has been removed.`);
       modal.destroy();
       _allUsers = _allUsers.filter(u => u.id !== user.id);
       renderTable(_allUsers);
@@ -397,7 +397,7 @@ function openEditModal(user) {
     btn.classList.remove('loading');
 
     if (result.success) {
-      Toast.success('User Updated', \`\${name}'s profile has been saved.\`);
+      Toast.success('User Updated', `${name}'s profile has been saved.`);
       modal.destroy();
       const idx = _allUsers.findIndex(u => u.id === user.id);
       if (idx !== -1) {
