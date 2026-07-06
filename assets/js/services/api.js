@@ -50,6 +50,7 @@ export async function apiRequest(path, options = {}) {
 
   try {
     const response = await fetch(url, {
+      cache: 'no-store',
       ...options,
       headers,
       // DECISION: Using 'same-origin' during dev. Switch to 'include'
