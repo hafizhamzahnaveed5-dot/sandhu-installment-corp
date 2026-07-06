@@ -33,7 +33,7 @@ export default async function init() {
               <polyline points="22,6 12,13 2,6"/>
             </svg>
             <input type="email" id="email" class="form-control" placeholder="admin@sandhuinstallments.com"
-              required autocomplete="email" value="admin@sandhuinstallments.com"/>
+              required autocomplete="email" />
           </div>
         </div>
 
@@ -45,7 +45,7 @@ export default async function init() {
               <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
             </svg>
             <input type="password" id="password" class="form-control" placeholder="••••••••"
-              required autocomplete="current-password" value="admin123"/>
+              required autocomplete="current-password" />
             <button type="button" id="toggle-password" class="input-suffix btn btn-ghost btn-icon" style="background:none;border:none;cursor:pointer;padding:4px">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="eye-icon">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
@@ -63,10 +63,6 @@ export default async function init() {
         </button>
       </form>
 
-      <div class="alert alert-info" style="margin-top:24px;font-size:12px">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <span><strong>Demo credentials:</strong> admin@sandhuinstallments.com / admin123</span>
-      </div>
     </div>
   `;
 

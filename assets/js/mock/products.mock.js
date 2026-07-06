@@ -77,7 +77,7 @@ export const MOCK_USERS = [
     permissions: ['*'],
     lastLogin: '2024-07-05T06:00:00Z',
     status: 'active',
-    password: 'admin123', // DECISION: mock only. Real auth uses hashed passwords server-side.
+    // DECISION: mock only. Real auth uses hashed passwords server-side.
   },
   {
     id: 'user-002',
