@@ -219,7 +219,7 @@ export default async function init() {
       installmentAmount: principalInstallment,
       frequency,
       startDate,
-      interestOrMarkup: markupAmt,
+      interestOrMarkup: markupRate,
       createdBy: 'user-001'
     });
 

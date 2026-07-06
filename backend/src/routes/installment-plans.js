@@ -79,16 +79,17 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
   if (missing.length) return fail(res, 400, `Missing required fields: ${missing.join(', ')}.`);
 
   const id = newId('plan');
-  const principalAmount = Number(req.body.principalAmount);
-  const downPayment = Number(req.body.downPayment);
-  const installmentAmount = Number(req.body.installmentAmount);
-  const numInstallments = Number(req.body.numberOfInstallments);
-  const markup = Number(req.body.interestOrMarkup || 0);
-  const markupShare = markup / numInstallments;
-  const amountDuePerInstallment = installmentAmount + markupShare;
-  const outstandingBalance = (installmentAmount * numInstallments) + markup;
-  const netFinanced = Math.max(principalAmount - downPayment, 0);
-  const principalShare = Number((netFinanced / numInstallments).toFixed(2));
+  const principalAmount    = Number(req.body.principalAmount);
+  const downPayment        = Number(req.body.downPayment);
+  const installmentAmount  = Number(req.body.installmentAmount);
+  const numInstallments    = Number(req.body.numberOfInstallments);
+  const interestRate       = Number(req.body.interestOrMarkup || 0); // percentage, e.g. 5.4
+  const netFinanced        = Math.max(principalAmount - downPayment, 0);
+  const totalMarkup        = Number((netFinanced * interestRate / 100).toFixed(2)); // total rupee markup
+  const markupShare        = totalMarkup / numInstallments;           // per-installment rupee markup
+  const amountDuePerInstallment = installmentAmount + markupShare;    // principal share + markup share
+  const outstandingBalance = (installmentAmount * numInstallments) + totalMarkup;
+  const principalShare     = Number((netFinanced / numInstallments).toFixed(2));
 
   const row = await withTransaction(async (client) => {
     const customer = await client.query('SELECT id FROM customers WHERE id = $1', [req.body.customerId]);
@@ -103,7 +104,7 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
       [
         id, req.body.customerId, req.body.productId || null, req.body.principalAmount, req.body.downPayment,
         req.body.numberOfInstallments, req.body.installmentAmount, req.body.frequency, req.body.startDate,
-        markup, markup, outstandingBalance, req.user.id,
+        interestRate, totalMarkup, outstandingBalance, req.user.id,
       ]
     );
 
