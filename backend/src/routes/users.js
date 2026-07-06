@@ -23,15 +23,6 @@ router.put('/me/password', asyncHandler(async (req, res) => {
   const matches = await bcrypt.compare(currentPassword, existing.rows[0].password_hash);
   if (!matches) return fail(res, 400, 'Current password is incorrect.');
 
-  if (!currentPassword || !newPassword) return fail(res, 400, 'Current and new passwords are required.');
-  if (newPassword.length < 8) return fail(res, 400, 'New password must be at least 8 characters long.');
-
-  const result = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
-  if (!result.rowCount) return fail(res, 404, 'User not found.');
-
-  const matches = await bcrypt.compare(currentPassword, result.rows[0].password_hash);
-  if (!matches) return fail(res, 401, 'Incorrect current password.');
-
   const newHash = await bcrypt.hash(newPassword, 12);
 
   await withTransaction(async (client) => {
