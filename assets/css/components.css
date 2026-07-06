@@ -10,6 +10,7 @@
   justify-content: center;
   gap: var(--space-2);
   padding: 10px var(--space-5);
+  min-height: 40px;
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   border-radius: var(--radius-sm);
@@ -251,11 +252,13 @@
 /* ── Tables ────────────────────────────────────────────────── */
 .table-wrapper {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
 }
 .data-table {
   width: 100%;
+  min-width: 720px;
   border-collapse: collapse;
   font-size: var(--text-sm);
 }
@@ -320,6 +323,7 @@
 .form-control {
   width: 100%;
   padding: 10px 14px;
+  min-height: 44px;
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-sm);
@@ -377,6 +381,7 @@ select.form-control option { background: var(--color-bg-elevated); color: var(--
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-height: 44px;
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -511,6 +516,7 @@ select.form-control option { background: var(--color-bg-elevated); color: var(--
   align-items: center;
   gap: var(--space-3);
   padding: 10px 14px;
+  min-height: 44px;
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
   cursor: pointer;
@@ -559,6 +565,7 @@ select.form-control option { background: var(--color-bg-elevated); color: var(--
 }
 .tab-btn {
   padding: 10px var(--space-5);
+  min-height: 44px;
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   color: var(--color-text-tertiary);
@@ -758,6 +765,7 @@ select.form-control option { background: var(--color-bg-elevated); color: var(--
   align-items: center;
   gap: var(--space-2);
   padding: 6px 12px;
+  min-height: 36px;
   border-radius: var(--radius-full);
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
@@ -783,4 +791,112 @@ select.form-control option { background: var(--color-bg-elevated); color: var(--
   flex: 1;
   height: 1px;
   background: var(--color-border);
+}
+
+@media (max-width: 768px) {
+  .btn,
+  .btn-sm,
+  .btn-icon,
+  .btn-icon-lg,
+  .page-btn,
+  .filter-chip {
+    min-height: 44px;
+  }
+  .btn-icon,
+  .btn-icon-lg,
+  .page-btn {
+    min-width: 44px;
+  }
+  .card-header .btn {
+    flex: 1 1 auto;
+  }
+  .table-wrapper {
+    margin-inline: calc(var(--space-4) * -1);
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+  }
+  .data-table {
+    min-width: 680px;
+  }
+  .data-table thead th,
+  .data-table tbody td {
+    padding: 12px var(--space-3);
+  }
+  .filter-bar {
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+  .filter-bar .search-input {
+    flex-basis: 100%;
+    max-width: none !important;
+  }
+  .filter-bar .flex {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+  .modal-backdrop {
+    align-items: stretch;
+    padding: var(--space-3);
+  }
+  .modal {
+    max-height: calc(100vh - var(--space-6));
+  }
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding: var(--space-4);
+  }
+  .modal-footer {
+    flex-wrap: wrap;
+  }
+  .modal-footer .btn {
+    flex: 1 1 160px;
+  }
+  .tabs {
+    overflow-x: auto;
+  }
+  .info-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+  }
+  .info-value {
+    text-align: left;
+  }
+}
+
+@media (max-width: 480px) {
+  .card,
+  .stat-card {
+    border-radius: var(--radius-sm);
+  }
+  .data-table {
+    min-width: 620px;
+    font-size: var(--text-xs);
+  }
+  .badge {
+    padding: 4px 8px;
+  }
+  .pagination {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .card-glass,
+  .modal,
+  .modal-header,
+  .dropdown-menu {
+    background: var(--color-bg-elevated);
+  }
+  .modal-backdrop {
+    background: var(--color-bg-overlay);
+  }
 }
