@@ -128,9 +128,9 @@ function renderTable(payments) {
 
   tbody.innerHTML = payments.map(p => `
     <tr style="cursor:pointer" onclick="window.location.hash='/payments/${p.id}'">
-      <td class="mono" style="font-weight:600">${p.receiptNumber}</td>
+      <td class="mono" style="font-weight:600">${p.receiptNumber} ${p.status === 'reversed' ? '<span class="badge badge-danger badge-nodot">REVERSED</span>' : ''}</td>
       <td class="mono">${p.planId}</td>
-      <td style="font-weight:700;color:var(--color-accent-green);font-family:var(--font-mono)">${formatCurrency(p.amount)}</td>
+      <td style="font-weight:700;color:${p.status === 'reversed' ? 'var(--color-text-tertiary)' : 'var(--color-accent-green)'};${p.status === 'reversed' ? 'text-decoration:line-through;' : ''}font-family:var(--font-mono)">${formatCurrency(p.amount)}</td>
       <td><span class="badge badge-info badge-nodot">${p.method.toUpperCase()}</span></td>
       <td>${renderSmsBadge(p.smsStatus)}</td>
       <td class="secondary">${formatDate(p.paidAt)}</td>

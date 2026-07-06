@@ -29,9 +29,75 @@ export default async function init() {
       </div>
 
       <h4 style="margin-bottom:12px;border-bottom:1px solid var(--color-border);padding-bottom:8px">Granted Scopes</h4>
-      <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:32px">
         ${user?.permissions.map(p => `<span class="badge badge-nodot" style="background:var(--color-bg-secondary);border:1px solid var(--color-border)">${p}</span>`).join('')}
       </div>
+      
+      <h4 style="margin-bottom:12px;border-bottom:1px solid var(--color-border);padding-bottom:8px">Security</h4>
+      <form id="change-password-form" style="display:flex;flex-direction:column;gap:16px">
+        <div id="pw-error" class="alert alert-danger" style="display:none"></div>
+        <div id="pw-success" class="alert alert-success" style="display:none"></div>
+        
+        <div class="form-group">
+          <label class="form-label">Current Password</label>
+          <input type="password" id="current-password" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">New Password</label>
+          <input type="password" id="new-password" class="form-control" required minlength="8">
+          <div class="form-hint">Minimum 8 characters</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm New Password</label>
+          <input type="password" id="confirm-password" class="form-control" required minlength="8">
+        </div>
+        <div>
+          <button type="submit" class="btn btn-primary" id="pw-submit-btn">Update Password</button>
+        </div>
+      </form>
     </div>
   `;
+
+  document.getElementById('change-password-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('pw-submit-btn');
+    const err = document.getElementById('pw-error');
+    const succ = document.getElementById('pw-success');
+    
+    err.style.display = 'none';
+    succ.style.display = 'none';
+    
+    const current = document.getElementById('current-password').value;
+    const newPw = document.getElementById('new-password').value;
+    const confirm = document.getElementById('confirm-password').value;
+    
+    if (newPw !== confirm) {
+      err.textContent = 'New passwords do not match.';
+      err.style.display = 'block';
+      return;
+    }
+    
+    if (newPw.length < 8) {
+      err.textContent = 'New password must be at least 8 characters long.';
+      err.style.display = 'block';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Updating...';
+    
+    const res = await AuthService.changePassword(current, newPw);
+    
+    btn.disabled = false;
+    btn.textContent = 'Update Password';
+    
+    if (res.success) {
+      succ.textContent = 'Password updated successfully.';
+      succ.style.display = 'block';
+      e.target.reset();
+    } else {
+      err.textContent = res.error || 'Failed to update password.';
+      err.style.display = 'block';
+    }
+  });
 }

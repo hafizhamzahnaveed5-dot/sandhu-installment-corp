@@ -65,8 +65,8 @@ function renderShell(user) {
     </div>
 
     <!-- KPI Grid: skeleton while loading, replaced by refreshKPIs() -->
-    <div class="kpi-grid" id="dash-kpi-grid">
-      ${[1,2,3,4].map(() => `
+    <div class="kpi-grid" id="dash-kpi-grid" style="grid-template-columns:repeat(5,1fr)">
+      ${[1,2,3,4,5].map(() => `
         <div class="stat-card">
           <div class="skeleton" style="height:80px;border-radius:var(--radius-sm)"></div>
         </div>
@@ -235,6 +235,18 @@ function refreshKPIs(summaryRes) {
       icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="12" y1="1" x2="12" y2="23"/>
         <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+      </svg>`,
+    },
+    {
+      label: 'Total Profit (Markup)',
+      value: formatCurrency(d.totalProfit, true),
+      change: 'Earned to date',
+      changeDir: 'up',
+      link: '#/reports',
+      color: 'var(--color-accent-purple)',
+      bg: 'var(--color-accent-purple-dim)',
+      icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
       </svg>`,
     },
     {

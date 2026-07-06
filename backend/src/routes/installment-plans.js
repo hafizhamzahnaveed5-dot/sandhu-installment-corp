@@ -12,7 +12,8 @@ router.use(authenticate);
 
 function addPeriod(startDate, frequency, index) {
   const date = new Date(`${startDate}T00:00:00Z`);
-  if (frequency === 'weekly') date.setUTCDate(date.getUTCDate() + index * 7);
+  if (frequency === 'daily') date.setUTCDate(date.getUTCDate() + index);
+  else if (frequency === 'weekly') date.setUTCDate(date.getUTCDate() + index * 7);
   else date.setUTCMonth(date.getUTCMonth() + index);
   return date.toISOString().slice(0, 10);
 }
@@ -43,7 +44,8 @@ router.get('/', asyncHandler(async (req, res) => {
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const count = await pool.query(`SELECT count(*)::int AS total FROM installment_plans p ${whereSql}`, values);
   const rows = await pool.query(
-    `SELECT p.*, c.full_name AS customer_name
+    `SELECT p.*, c.full_name AS customer_name,
+            (SELECT COALESCE(sum(markup_earned), 0) FROM installment_schedules WHERE plan_id = p.id) AS total_markup_earned
      FROM installment_plans p
      JOIN customers c ON c.id = p.customer_id
      ${whereSql}
@@ -76,7 +78,16 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
   if (missing.length) return fail(res, 400, `Missing required fields: ${missing.join(', ')}.`);
 
   const id = newId('plan');
-  const outstandingBalance = Number(req.body.installmentAmount) * Number(req.body.numberOfInstallments);
+  const principalAmount = Number(req.body.principalAmount);
+  const downPayment = Number(req.body.downPayment);
+  const installmentAmount = Number(req.body.installmentAmount);
+  const numInstallments = Number(req.body.numberOfInstallments);
+  const markup = Number(req.body.interestOrMarkup || 0);
+  const markupShare = markup / numInstallments;
+  const amountDuePerInstallment = installmentAmount + markupShare;
+  const outstandingBalance = (installmentAmount * numInstallments) + markup;
+  const netFinanced = Math.max(principalAmount - downPayment, 0);
+  const principalShare = Number((netFinanced / numInstallments).toFixed(2));
 
   const row = await withTransaction(async (client) => {
     const customer = await client.query('SELECT id FROM customers WHERE id = $1', [req.body.customerId]);
@@ -85,22 +96,25 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
     const inserted = await client.query(
       `INSERT INTO installment_plans
        (id, customer_id, product_id, principal_amount, down_payment, number_of_installments,
-        installment_amount, frequency, start_date, status, interest_or_markup, outstanding_balance, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'active',$10,$11,$12)
+        installment_amount, frequency, start_date, status, interest_or_markup, markup_amount, outstanding_balance, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'active',$10,$11,$12,$13)
        RETURNING *`,
       [
         id, req.body.customerId, req.body.productId || null, req.body.principalAmount, req.body.downPayment,
         req.body.numberOfInstallments, req.body.installmentAmount, req.body.frequency, req.body.startDate,
-        req.body.interestOrMarkup || 0, outstandingBalance, req.user.id,
+        markup, markup, outstandingBalance, req.user.id,
       ]
     );
 
-    for (let i = 1; i <= Number(req.body.numberOfInstallments); i += 1) {
+    for (let i = 1; i <= numInstallments; i += 1) {
+      const principalDue = i === numInstallments
+        ? Number((netFinanced - principalShare * (numInstallments - 1)).toFixed(2))
+        : principalShare;
       await client.query(
         `INSERT INTO installment_schedules
-         (id, plan_id, installment_number, due_date, amount_due, amount_paid, status)
-         VALUES ($1,$2,$3,$4,$5,0,'pending')`,
-        [newId('sch'), id, i, addPeriod(req.body.startDate, req.body.frequency, i - 1), req.body.installmentAmount]
+         (id, plan_id, installment_number, due_date, amount_due, amount_paid, principal_due, principal_paid, markup_amount, markup_earned, status)
+         VALUES ($1,$2,$3,$4,$5,0,$6,0,$7,0,'pending')`,
+        [newId('sch'), id, i, addPeriod(req.body.startDate, req.body.frequency, i - 1), amountDuePerInstallment, principalDue, markupShare]
       );
     }
 

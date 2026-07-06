@@ -254,6 +254,15 @@ const AuthService = {
     }
     return api.post('/auth/forgot-password', { email });
   },
+
+  /** Change the current user's password */
+  async changePassword(currentPassword, newPassword) {
+    if (Config.FEATURE_FLAGS.MOCK_MODE) {
+      await delay(600);
+      return { success: true, data: { message: 'Mock password updated successfully' }, error: null };
+    }
+    return api.put('/users/me/password', { currentPassword, newPassword });
+  },
 };
 
 export default AuthService;

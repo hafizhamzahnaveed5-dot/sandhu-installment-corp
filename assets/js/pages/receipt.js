@@ -15,6 +15,8 @@ import { renderNavbar } from '../components/navbar.js';
 import InstallmentsService from '../services/installments.service.js';
 import { formatCurrency, formatDate, Config } from '../config.js';
 import AuthService from '../services/auth.service.js';
+import Modal from '../components/modal.js';
+import Toast from '../components/toast.js';
 
 export default async function init({ param }) {
   const paymentId = param;
@@ -81,6 +83,11 @@ export default async function init({ param }) {
           </svg>
           Print Receipt
         </button>
+        ${(AuthService.isAdmin() && p.status !== 'reversed') ? `
+          <button class="btn btn-danger" id="btn-revert-payment">
+            Reverse Payment
+          </button>
+        ` : ''}
       </div>
     </div>
 
@@ -119,6 +126,7 @@ export default async function init({ param }) {
         <div style="text-align:right">
           <div style="font-size:18px;font-weight:800;letter-spacing:.05em;
                       color:var(--color-accent-green)">PAYMENT RECEIPT</div>
+          ${p.status === 'reversed' ? `<div style="font-size:14px;font-weight:800;letter-spacing:.05em;color:var(--color-accent-red);margin-top:4px">VOID / REVERSED</div>` : ''}
           <div style="font-size:13px;font-family:var(--font-mono);font-weight:600;
                       color:var(--color-text-secondary);margin-top:4px">
             # ${p.receiptNumber}
@@ -158,6 +166,7 @@ export default async function init({ param }) {
             <div><strong>Method:</strong> ${p.method?.toUpperCase() || '—'}</div>
             <div><strong>Plan ID:</strong> #${p.planId}</div>
             <div><strong>Installment #:</strong> ${installmentNo}</div>
+            ${p.isEarlySettlement ? `<div style="color:var(--color-accent-purple);font-weight:bold;margin-top:4px">✨ Early Settlement</div>` : ''}
           </div>
         </div>
       </div>
@@ -177,6 +186,11 @@ export default async function init({ param }) {
         <div style="margin-top:8px;font-size:12px;color:var(--color-text-secondary)">
           ${p.amount && p.amount.toLocaleString ? `PKR ${p.amount.toLocaleString('en-PK')} only` : ''}
         </div>
+        ${p.isEarlySettlement && p.markupWaived > 0 ? `
+        <div style="margin-top:12px;padding:8px;background:var(--color-accent-purple-dim);color:var(--color-accent-purple);border-radius:4px;font-size:12px;font-weight:bold">
+          Future Markup Waived: ${formatCurrency(p.markupWaived)}
+        </div>
+        ` : ''}
       </div>
 
       <!-- Outstanding Balance -->
@@ -227,4 +241,49 @@ export default async function init({ param }) {
       </div>
     </div>
   `;
+
+  // Bind reverse event
+  const revertBtn = document.getElementById('btn-revert-payment');
+  if (revertBtn) {
+    revertBtn.addEventListener('click', () => {
+      const modal = Modal.create({
+        title: 'Reverse Payment',
+        content: `
+          <p>Are you sure you want to reverse this payment of <strong>${formatCurrency(p.amount)}</strong>? This will re-open the installment schedule and adjust balances. This cannot be undone.</p>
+          <div class="form-group" style="margin-top:16px">
+            <label class="form-label">Reason for reversal <span class="required">*</span></label>
+            <input type="text" id="reversal-reason" class="form-control" placeholder="E.g., Cheque bounced, entered by mistake" required minlength="5">
+          </div>
+        `,
+        footer: `
+          <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
+          <button class="btn btn-danger" id="modal-confirm">Confirm Reversal</button>
+        `
+      });
+      modal.open();
+      
+      modal.backdrop.querySelector('#modal-cancel').addEventListener('click', modal.destroy);
+      modal.backdrop.querySelector('#modal-confirm').addEventListener('click', async () => {
+        const reason = modal.backdrop.querySelector('#reversal-reason').value;
+        if (!reason || reason.length < 5) {
+          Toast.warning('Validation', 'Please provide a reason of at least 5 characters.');
+          return;
+        }
+        
+        const confirmBtn = modal.backdrop.querySelector('#modal-confirm');
+        confirmBtn.classList.add('loading');
+        
+        const result = await InstallmentsService.revertPayment(p.id, reason);
+        confirmBtn.classList.remove('loading');
+        
+        if (result.success) {
+          Toast.success('Reversed', 'Payment reversed successfully.');
+          modal.destroy();
+          init({ param }); // Reload receipt page
+        } else {
+          Toast.error('Error', result.error);
+        }
+      });
+    });
+  }
 }

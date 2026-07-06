@@ -11,6 +11,37 @@ import { asyncHandler, fail, ok, pagination, paginationParams } from '../utils/r
 const router = express.Router();
 
 router.use(authenticate);
+
+router.put('/me/password', asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  if (!currentPassword || !newPassword) return fail(res, 400, 'currentPassword and newPassword are required.');
+  if (String(newPassword).length < 8) return fail(res, 400, 'New password must be at least 8 characters.');
+
+  const existing = await pool.query('SELECT id, password_hash FROM users WHERE id = $1', [req.user.id]);
+  if (!existing.rowCount) return fail(res, 404, 'User not found.');
+
+  const matches = await bcrypt.compare(currentPassword, existing.rows[0].password_hash);
+  if (!matches) return fail(res, 400, 'Current password is incorrect.');
+
+  if (!currentPassword || !newPassword) return fail(res, 400, 'Current and new passwords are required.');
+  if (newPassword.length < 8) return fail(res, 400, 'New password must be at least 8 characters long.');
+
+  const result = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
+  if (!result.rowCount) return fail(res, 404, 'User not found.');
+
+  const matches = await bcrypt.compare(currentPassword, result.rows[0].password_hash);
+  if (!matches) return fail(res, 401, 'Incorrect current password.');
+
+  const newHash = await bcrypt.hash(newPassword, 12);
+
+  await withTransaction(async (client) => {
+    await client.query('UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2', [newHash, req.user.id]);
+    await writeAudit(client, req.user.id, 'UPDATE', 'User', req.user.id, 'User changed their own password');
+  });
+
+  return ok(res, { message: 'Password updated successfully' });
+}));
+
 router.use(requireRole('admin'));
 
 router.get('/', asyncHandler(async (req, res) => {

@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 const JWT_SECRET = 'zktcbAbGh8U3lrHNFZyJr1FgNlpUVskYljVjxGl3jkDaVTYQf9ViudR4pv+u0++s';
-const BASE_URL = 'http://localhost:3000/api';
+const BASE_URL = 'https://sandhu-installment-corp-production.up.railway.app/api';
 
 async function run() {
   // Forge admin token
@@ -23,7 +23,7 @@ async function run() {
     process.exit(1);
   }
 
-  const customerId = customers[1].id;
+  const customerId = customers[2].id;
   console.log(`2. Attempting to create Customer user with customerId: "${customerId}"`);
 
   res = await fetch(`${BASE_URL}/users`, {

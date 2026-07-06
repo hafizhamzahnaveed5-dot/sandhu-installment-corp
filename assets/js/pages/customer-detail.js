@@ -33,8 +33,10 @@ export default async function init({ param }) {
   renderNavbar('Customer Detail', c.fullName);
 
   // Calculate ledger stats
-  const totalPaid = plans.reduce((s, p) => s + (p.numberOfInstallments * p.installmentAmount - (p.principalAmount - (p.amountPaid || 0))), 0);
   const activePlans = plans.filter(p => p.status === 'active').length;
+  
+  const totalExpectedMarkup = plans.reduce((s, p) => s + (p.markupAmount || 0), 0);
+  const totalEarnedMarkup = plans.reduce((s, p) => s + (p.markupEarned || 0), 0);
 
   const statusBadge = `<span class="badge badge-${c.status}">${capitalize(c.status)}</span>`;
 
@@ -74,10 +76,14 @@ export default async function init({ param }) {
       </div>
 
       <!-- Stats row -->
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-4);margin-top:var(--space-6);padding-top:var(--space-5);border-top:1px solid var(--color-border)">
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:var(--space-4);margin-top:var(--space-6);padding-top:var(--space-5);border-top:1px solid var(--color-border)">
         <div style="text-align:center">
           <div style="font-size:20px;font-weight:700;color:var(--color-accent-blue)">${formatCurrency(c.totalOutstanding)}</div>
           <div style="font-size:12px;color:var(--color-text-tertiary)">Outstanding</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:20px;font-weight:700;color:var(--color-accent-purple)">${formatCurrency(totalEarnedMarkup)}</div>
+          <div style="font-size:12px;color:var(--color-text-tertiary)">Earned Profit</div>
         </div>
         <div style="text-align:center">
           <div style="font-size:20px;font-weight:700;color:var(--color-text-primary)">${plans.length}</div>
@@ -229,9 +235,9 @@ function renderPlanCard(plan) {
             <span style="font-family:var(--font-mono);font-size:12px;color:var(--color-text-tertiary)">#${plan.id}</span>
             <span class="badge badge-${plan.status}">${capitalize(plan.status)}</span>
           </div>
-          <div style="font-size:24px;font-weight:700;color:var(--color-text-primary)">${formatCurrency(plan.principalAmount)}</div>
+          <div style="font-size:24px;font-weight:700;color:var(--color-text-primary)">${formatCurrency(plan.principalAmount)} <span style="font-size:14px;font-weight:500;color:var(--color-text-tertiary)">+ ${formatCurrency(plan.markupAmount)} markup</span></div>
           <div style="font-size:13px;color:var(--color-text-secondary);margin-top:4px">
-            ${plan.numberOfInstallments} × ${formatCurrency(plan.installmentAmount)} / ${plan.frequency}
+            ${plan.numberOfInstallments} × ${formatCurrency(plan.installmentAmount + (plan.markupAmount / plan.numberOfInstallments))} / ${plan.frequency}
             &nbsp;·&nbsp; Started ${formatDate(plan.startDate)}
           </div>
         </div>

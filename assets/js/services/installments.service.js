@@ -136,6 +136,30 @@ const InstallmentsService = {
     return api.post('/payments', payload);
   },
 
+  /** Revert a payment (admin only) */
+  async revertPayment(paymentId, reason) {
+    if (Config.FEATURE_FLAGS.MOCK_MODE) {
+      await delay(500);
+      const payment = mockPayments.find(p => p.id === paymentId);
+      if (!payment) return { success: false, data: null, error: 'Payment not found.' };
+      
+      payment.status = 'reversed';
+      payment.reversedAt = new Date().toISOString();
+      payment.reversalReason = reason;
+
+      const schedIdx = mockSchedule.findIndex(s => s.id === payment.scheduleId);
+      if (schedIdx !== -1) {
+        mockSchedule[schedIdx].amountPaid = Math.max(0, mockSchedule[schedIdx].amountPaid - payment.amount);
+        mockSchedule[schedIdx].status = mockSchedule[schedIdx].amountPaid > 0 ? 'partial' : 'pending';
+      }
+
+      await AuditService.log('UPDATE', 'Payment', paymentId, `Reversed payment. Reason: ${reason}`);
+      EventBus.emit('payment:recorded', payment); // Trigger re-render
+      return { success: true, data: payment, error: null };
+    }
+    return api.put(`/payments/${paymentId}/reverse`, { reason });
+  },
+
   /** List payments with optional filters */
   async listPayments({ planId = '', dateFrom = '', dateTo = '' } = {}) {
     if (Config.FEATURE_FLAGS.MOCK_MODE) {

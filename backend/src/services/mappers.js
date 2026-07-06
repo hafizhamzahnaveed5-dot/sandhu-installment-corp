@@ -35,6 +35,11 @@ export function mapPlan(row) {
     startDate: row.start_date?.toISOString?.().slice(0, 10) || row.start_date,
     status: row.status,
     interestOrMarkup: Number(row.interest_or_markup),
+    markupAmount: Number(row.markup_amount || 0),
+    markupWaived: Number(row.markup_waived || 0),
+    markupEarned: Number(row.total_markup_earned || 0),
+    settledEarlyAt: row.settled_early_at?.toISOString?.() || row.settled_early_at,
+    settlementNote: row.settlement_note,
     outstandingBalance: Number(row.outstanding_balance || 0),
     createdBy: row.created_by,
     createdAt: row.created_at?.toISOString?.() || row.created_at,
@@ -50,8 +55,14 @@ export function mapSchedule(row) {
     dueDate: row.due_date?.toISOString?.().slice(0, 10) || row.due_date,
     amountDue: Number(row.amount_due),
     amountPaid: Number(row.amount_paid),
+    principalDue: Number(row.principal_due || 0),
+    principalPaid: Number(row.principal_paid || 0),
+    markupAmount: Number(row.markup_amount || 0),
+    markupEarned: Number(row.markup_earned || 0),
+    markupWaived: Number(row.markup_waived || 0),
     status: row.status,
     paidDate: row.paid_date?.toISOString?.() || row.paid_date,
+    closedReason: row.closed_reason,
   };
 }
 
@@ -69,6 +80,12 @@ export function mapPayment(row) {
     paidAt: row.paid_at?.toISOString?.() || row.paid_at,
     notes: row.notes,
     smsStatus: row.sms_status || null,
+    status: row.status || 'posted',
+    reversedAt: row.reversed_at?.toISOString?.() || row.reversed_at,
+    reversedBy: row.reversed_by,
+    reversalReason: row.reversal_reason,
+    isEarlySettlement: row.is_early_settlement || false,
+    markupWaived: Number(row.markup_waived || 0),
   };
 }
 

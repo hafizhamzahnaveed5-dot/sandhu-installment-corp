@@ -106,6 +106,7 @@ export default async function init() {
               <select id="plan-frequency" class="form-control">
                 <option value="monthly">Monthly</option>
                 <option value="weekly">Weekly</option>
+                <option value="daily">Daily</option>
               </select>
             </div>
 
@@ -127,7 +128,7 @@ export default async function init() {
               <span class="info-value" id="summary-markup">PKR 0</span>
             </div>
             <div class="info-row" style="border-bottom:none">
-              <span class="info-label">Estimated Installment Amount:</span>
+              <span class="info-label">Estimated Installment (Principal + Markup):</span>
               <span class="info-value" id="summary-installment" style="font-size:16px;color:var(--color-accent-blue);font-weight:700">PKR 0</span>
             </div>
           </div>
@@ -204,8 +205,7 @@ export default async function init() {
 
     const netFinanced = principalAmount - downPayment;
     const markupAmt = netFinanced * (markupRate / 100);
-    const totalFinanced = netFinanced + markupAmt;
-    const installmentAmount = Math.ceil(totalFinanced / duration);
+    const principalInstallment = Math.ceil(netFinanced / duration);
 
     btn.classList.add('loading');
     btn.textContent = '';
@@ -216,10 +216,10 @@ export default async function init() {
       principalAmount,
       downPayment,
       numberOfInstallments: duration,
-      installmentAmount,
+      installmentAmount: principalInstallment,
       frequency,
       startDate,
-      interestOrMarkup: markupRate,
+      interestOrMarkup: markupAmt,
       createdBy: 'user-001'
     });
 
@@ -244,11 +244,12 @@ export default async function init() {
 
     const net = Math.max(0, principal - downPayment);
     const markup = net * (markupPercent / 100);
-    const total = net + markup;
-    const installment = Math.ceil(total / duration);
+    const principalInstallment = Math.ceil(net / duration);
+    const markupInstallment = markup / duration;
+    const totalInstallment = principalInstallment + markupInstallment;
 
     document.getElementById('summary-net').textContent = formatCurrency(net);
     document.getElementById('summary-markup').textContent = formatCurrency(markup);
-    document.getElementById('summary-installment').textContent = formatCurrency(installment);
+    document.getElementById('summary-installment').textContent = formatCurrency(totalInstallment);
   }
 }

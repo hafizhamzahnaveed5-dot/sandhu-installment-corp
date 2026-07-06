@@ -18,7 +18,8 @@ router.get('/summary', asyncHandler(async (_req, res) => {
       (SELECT COALESCE(sum(amount), 0)::numeric FROM payments WHERE date_trunc('month', paid_at) = date_trunc('month', now())) AS monthly_collection,
       (SELECT count(*)::int FROM installment_plans WHERE status = 'overdue') AS overdue_count,
       (SELECT count(*)::int FROM installment_schedules WHERE status = 'due-soon') AS due_soon_count,
-      (SELECT COALESCE(sum(amount), 0)::numeric FROM payments) AS total_revenue
+      (SELECT COALESCE(sum(amount), 0)::numeric FROM payments) AS total_revenue,
+      (SELECT COALESCE(sum(markup_earned), 0)::numeric FROM installment_schedules) AS total_profit
   `);
   const row = result.rows[0];
   return ok(res, {
@@ -29,6 +30,7 @@ router.get('/summary', asyncHandler(async (_req, res) => {
     overdueCount: row.overdue_count,
     dueSoonCount: row.due_soon_count,
     totalRevenue: Number(row.total_revenue),
+    totalProfit: Number(row.total_profit),
   });
 }));
 
