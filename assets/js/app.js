@@ -134,6 +134,7 @@ async function route() {
 function toggleShell(show) {
   const shell = document.getElementById('app-shell');
   const auth  = document.getElementById('auth-layout');
+  if (!shell || !auth) return;
   if (show) {
     shell.style.display = 'flex';
     auth.style.display  = 'none';

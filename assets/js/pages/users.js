@@ -172,7 +172,7 @@ function renderTable(users) {
               </td>
               <td class="secondary">${u.lastLogin ? formatDate(u.lastLogin) : 'Never'}</td>
               <td style="text-align:right">
-                <button class="btn btn-ghost btn-sm" onclick="alert('Edit user coming in backend integration phase.')">Edit</button>
+                <button class="btn btn-ghost btn-sm edit-user-btn" data-id="${u.id}">Edit</button>
               </td>
             </tr>
           `).join('')}
@@ -183,6 +183,13 @@ function renderTable(users) {
       ${users.length} user${users.length !== 1 ? 's' : ''}
     </div>
   `;
+
+  document.querySelectorAll('.edit-user-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const user = _allUsers.find(u => u.id === btn.dataset.id);
+      if (user) openEditModal(user);
+    });
+  });
 }
 
 // ── Create User Modal ─────────────────────────────────────────────────────────
@@ -300,9 +307,106 @@ async function openCreateModal() {
       // Refresh the table without a page reload
       _allUsers = [..._allUsers, { ...result.data, password: undefined }];
       renderTable(_allUsers);
-      if (_searchHandle) _searchHandle.setData(_allUsers);
+      if (_searchHandle) _searchHandle.filter();
     } else {
       Toast.error('Error', result.error || 'Failed to create user.');
+    }
+  });
+}
+
+// ── Edit User Modal ───────────────────────────────────────────────────────────
+function openEditModal(user) {
+  const formHtml = `
+    <div class="form-grid">
+      <div class="form-group full-width">
+        <label class="form-label" for="eu-name">Full Name <span class="required">*</span></label>
+        <input type="text" id="eu-name" class="form-control" value="${user.name}" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="eu-email">Email Address</label>
+        <input type="email" id="eu-email" class="form-control" value="${user.email}" disabled>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="eu-role">Role <span class="required">*</span></label>
+        <select id="eu-role" class="form-control" ${user.role === 'customer' ? 'disabled' : ''}>
+          <option value="agent" ${user.role === 'agent' ? 'selected' : ''}>Agent — Installments & Payments</option>
+          <option value="manager" ${user.role === 'manager' ? 'selected' : ''}>Manager — Operational access</option>
+          <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Super Admin — Full access</option>
+          <option value="customer" ${user.role === 'customer' ? 'selected' : ''}>Customer — Self-service only</option>
+        </select>
+        ${user.role === 'customer' ? '<span class="form-help">Customer role cannot be changed.</span>' : ''}
+      </div>
+      <div class="form-group full-width">
+        <label class="form-label" for="eu-status">Account Status <span class="required">*</span></label>
+        <select id="eu-status" class="form-control">
+          <option value="active" ${user.status === 'active' ? 'selected' : ''}>Active</option>
+          <option value="inactive" ${user.status === 'inactive' ? 'selected' : ''}>Inactive (Suspended)</option>
+        </select>
+      </div>
+    </div>
+  `;
+
+  const footerHtml = `
+    <div style="flex:1">
+      <button class="btn btn-ghost text-danger" id="eu-delete">Delete User</button>
+    </div>
+    <button class="btn btn-secondary" id="eu-cancel">Cancel</button>
+    <button class="btn btn-primary" id="eu-submit">Save Changes</button>
+  `;
+
+  const modal = Modal.create({ title: 'Edit User', content: formHtml, footer: footerHtml });
+  modal.open();
+
+  modal.backdrop.querySelector('#eu-cancel')?.addEventListener('click', modal.destroy);
+
+  // Handle Delete
+  modal.backdrop.querySelector('#eu-delete')?.addEventListener('click', async () => {
+    if (!confirm(\`Are you sure you want to delete \${user.name} (\${user.email})? This action cannot be undone.\`)) return;
+    
+    const btn = modal.backdrop.querySelector('#eu-delete');
+    btn.classList.add('loading');
+
+    const result = await AuthService.deleteUser(user.id);
+    
+    if (result.success) {
+      Toast.success('User Deleted', \`\${user.name} has been removed.\`);
+      modal.destroy();
+      _allUsers = _allUsers.filter(u => u.id !== user.id);
+      renderTable(_allUsers);
+      if (_searchHandle) _searchHandle.filter();
+    } else {
+      btn.classList.remove('loading');
+      Toast.error('Delete Failed', result.error || 'Could not delete user.');
+    }
+  });
+
+  // Handle Save
+  modal.backdrop.querySelector('#eu-submit')?.addEventListener('click', async () => {
+    const name = modal.backdrop.querySelector('#eu-name')?.value?.trim();
+    // if role is customer, the select is disabled, so we pull from user.role directly
+    const role = user.role === 'customer' ? 'customer' : modal.backdrop.querySelector('#eu-role')?.value;
+    const status = modal.backdrop.querySelector('#eu-status')?.value;
+
+    if (!name) { Toast.warning('Validation', 'Name is required.'); return; }
+
+    const btn = modal.backdrop.querySelector('#eu-submit');
+    btn.classList.add('loading');
+
+    const result = await AuthService.updateUser(user.id, { name, role, status });
+
+    btn.classList.remove('loading');
+
+    if (result.success) {
+      Toast.success('User Updated', \`\${name}'s profile has been saved.\`);
+      modal.destroy();
+      const idx = _allUsers.findIndex(u => u.id === user.id);
+      if (idx !== -1) {
+        _allUsers[idx] = { ..._allUsers[idx], ...result.data };
+      }
+      renderTable(_allUsers);
+      if (_searchHandle) _searchHandle.filter();
+    } else {
+      Toast.error('Update Failed', result.error || 'Could not save changes.');
     }
   });
 }

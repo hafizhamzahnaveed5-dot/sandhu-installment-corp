@@ -173,6 +173,62 @@ const AuthService = {
     return api.post('/users', payload);
   },
 
+  /** Update an existing user */
+  async updateUser(id, payload) {
+    if (Config.FEATURE_FLAGS.MOCK_MODE) {
+      await delay(400);
+      const idx = MOCK_USERS.findIndex(u => u.id === id);
+      if (idx === -1) return { success: false, data: null, error: 'User not found.' };
+      
+      const existing = MOCK_USERS[idx];
+      
+      // Basic last-admin safeguard for mock mode
+      if (existing.role === 'admin' && (payload.role !== 'admin' || payload.status !== 'active')) {
+        const adminCount = MOCK_USERS.filter(u => u.role === 'admin' && u.status === 'active').length;
+        if (adminCount <= 1) return { success: false, data: null, error: 'Cannot demote or deactivate the last active admin account.' };
+      }
+
+      const permMap = {
+        admin:    ['*'],
+        manager:  ['customers.read','customers.write','installments.*','payments.*','reports.read'],
+        agent:    ['customers.read','installments.read','payments.create'],
+        customer: ['my-plan.read','my-payments.read'],
+      };
+
+      MOCK_USERS[idx] = { 
+        ...existing, 
+        name: payload.name, 
+        role: payload.role, 
+        status: payload.status,
+        permissions: permMap[payload.role] || existing.permissions 
+      };
+      return { success: true, data: MOCK_USERS[idx], error: null };
+    }
+    return api.put(`/users/${id}`, payload);
+  },
+
+  /** Delete a user */
+  async deleteUser(id) {
+    if (Config.FEATURE_FLAGS.MOCK_MODE) {
+      await delay(400);
+      const currentUser = this.getUser();
+      if (id === currentUser?.id) return { success: false, data: null, error: 'You cannot delete your own account.' };
+
+      const idx = MOCK_USERS.findIndex(u => u.id === id);
+      if (idx === -1) return { success: false, data: null, error: 'User not found.' };
+
+      const existing = MOCK_USERS[idx];
+      if (existing.role === 'admin') {
+        const adminCount = MOCK_USERS.filter(u => u.role === 'admin' && u.status === 'active').length;
+        if (adminCount <= 1) return { success: false, data: null, error: 'Cannot delete the last active admin account.' };
+      }
+
+      const [deleted] = MOCK_USERS.splice(idx, 1);
+      return { success: true, data: deleted, error: null };
+    }
+    return api.delete(`/users/${id}`);
+  },
+
   /** List all system users (admin only) */
   async listUsers() {
     if (Config.FEATURE_FLAGS.MOCK_MODE) {

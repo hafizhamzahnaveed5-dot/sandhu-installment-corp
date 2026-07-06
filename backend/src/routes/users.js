@@ -61,4 +61,57 @@ router.post('/', asyncHandler(async (req, res) => {
   return ok(res, mapUser(row));
 }));
 
+router.put('/:id', asyncHandler(async (req, res) => {
+  const { name, role, status } = req.body;
+  if (!name || !role || !status) return fail(res, 400, 'name, role, and status are required.');
+  if (!['admin', 'manager', 'agent', 'customer'].includes(role)) return fail(res, 400, 'Invalid user role.');
+  if (!['active', 'inactive'].includes(status)) return fail(res, 400, 'Invalid status.');
+
+  const existing = await pool.query('SELECT * FROM users WHERE id = $1', [req.params.id]);
+  if (!existing.rowCount) return fail(res, 404, 'User not found.');
+
+  // Prevent demoting or deactivating the last active admin
+  if (existing.rows[0].role === 'admin' && (role !== 'admin' || status !== 'active')) {
+    const adminCount = await pool.query(`SELECT count(*) FROM users WHERE role = 'admin' AND status = 'active' AND id != $1`, [req.params.id]);
+    if (parseInt(adminCount.rows[0].count) === 0) {
+      return fail(res, 400, 'Cannot demote or deactivate the last active admin account.');
+    }
+  }
+
+  const permissions = permissionsFor(role);
+  const row = await withTransaction(async (client) => {
+    const updated = await client.query(
+      `UPDATE users SET name=$1, role=$2, status=$3, permissions=$4, updated_at=now() WHERE id=$5 RETURNING *`,
+      [name, role, status, JSON.stringify(permissions), req.params.id]
+    );
+    await writeAudit(client, req.user.id, 'UPDATE', 'User', req.params.id, `Updated user: ${updated.rows[0].email}`);
+    return updated.rows[0];
+  });
+  return ok(res, mapUser(row));
+}));
+
+router.delete('/:id', asyncHandler(async (req, res) => {
+  if (req.params.id === req.user.id) {
+    return fail(res, 400, 'You cannot delete your own account.');
+  }
+
+  const existing = await pool.query('SELECT role, email FROM users WHERE id = $1', [req.params.id]);
+  if (!existing.rowCount) return fail(res, 404, 'User not found.');
+
+  if (existing.rows[0].role === 'admin') {
+    const adminCount = await pool.query(`SELECT count(*) FROM users WHERE role = 'admin' AND status = 'active'`);
+    if (parseInt(adminCount.rows[0].count) <= 1) {
+      return fail(res, 400, 'Cannot delete the last active admin account.');
+    }
+  }
+
+  const row = await withTransaction(async (client) => {
+    const deleted = await client.query('DELETE FROM users WHERE id = $1 RETURNING *', [req.params.id]);
+    await writeAudit(client, req.user.id, 'DELETE', 'User', req.params.id, `Deleted user: ${deleted.rows[0].email}`);
+    return deleted.rows[0];
+  });
+  
+  return ok(res, mapUser(row));
+}));
+
 export default router;
