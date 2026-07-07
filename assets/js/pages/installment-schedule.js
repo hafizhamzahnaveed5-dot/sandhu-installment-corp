@@ -249,6 +249,7 @@ export default async function init({ param }) {
 // Record Payment Modal (normal flow)
 // ─────────────────────────────────────────────────────────────────────────────
 function showPaymentModal(schedId, number, amount, planId, onSuccess) {
+  const today = new Date().toISOString().slice(0, 10);
   const modal = Modal.create({
     title: 'Record Installment Payment',
     content: `
@@ -260,6 +261,10 @@ function showPaymentModal(schedId, number, amount, planId, onSuccess) {
         <div class="form-group full-width">
           <label class="form-label">Amount Due (PKR)</label>
           <input type="number" id="pay-amount" class="form-control" value="${amount}" required/>
+        </div>
+        <div class="form-group full-width">
+          <label class="form-label" for="pay-date">Payment Date</label>
+          <input type="date" id="pay-date" class="form-control" value="${today}" required />
         </div>
         <div class="form-group full-width">
           <label class="form-label" for="pay-method">Payment Method</label>
@@ -283,6 +288,7 @@ function showPaymentModal(schedId, number, amount, planId, onSuccess) {
   modal.backdrop.querySelector('#modal-cancel').addEventListener('click', modal.destroy);
   modal.backdrop.querySelector('#modal-confirm').addEventListener('click', async () => {
     const payAmt = parseFloat(modal.backdrop.querySelector('#pay-amount').value);
+    const payDate = modal.backdrop.querySelector('#pay-date').value;
     const method = modal.backdrop.querySelector('#pay-method').value;
     const notes  = modal.backdrop.querySelector('#pay-notes').value;
 
@@ -290,14 +296,22 @@ function showPaymentModal(schedId, number, amount, planId, onSuccess) {
       Toast.warning('Validation', 'Please enter a valid amount.');
       return;
     }
+    if (!payDate) {
+      Toast.warning('Validation', 'Please select a payment date.');
+      return;
+    }
 
     const confirmBtn = modal.backdrop.querySelector('#modal-confirm');
     confirmBtn.classList.add('loading');
 
-    const result = await InstallmentsService.recordPayment({ planId, scheduleId: schedId, amount: payAmt, method, notes });
-    confirmBtn.classList.remove('loading');
-
-    if (result.success) {
+    const result = await InstallmentsService.recordPayment({
+      planId,
+      scheduleId: schedId,
+      amount: payAmt,
+      paidAt: payDate,
+      method,
+      notes,
+    });
       Toast.success('Success', 'Payment recorded successfully.');
       modal.destroy();
       onSuccess();

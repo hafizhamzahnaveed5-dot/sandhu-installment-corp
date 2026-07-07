@@ -117,7 +117,7 @@ const InstallmentsService = {
       const payment = {
         ...payload,
         id: `pay-${Date.now()}`,
-        paidAt: new Date().toISOString(),
+        paidAt: payload.paidAt || new Date().toISOString(),
         receiptNumber: `RCP-${new Date().getFullYear()}-${String(mockPayments.length + 1).padStart(4, '0')}`,
       };
       mockPayments.push(payment);
