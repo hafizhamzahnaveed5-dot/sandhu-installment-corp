@@ -80,7 +80,7 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
 
   const id = newId('plan');
   const principalAmount    = Number(req.body.principalAmount);
-  const purchaseCost       = Number(req.body.purchaseCost ?? req.body.principalAmount || 0);
+  const purchaseCost       = Number(req.body.purchaseCost ?? req.body.principalAmount ?? 0);
   const downPayment        = Number(req.body.downPayment);
   const installmentAmount  = Number(req.body.installmentAmount);
   const numInstallments    = Number(req.body.numberOfInstallments);
