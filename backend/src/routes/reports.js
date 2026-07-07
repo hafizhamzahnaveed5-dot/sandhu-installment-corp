@@ -19,7 +19,9 @@ router.get('/summary', asyncHandler(async (_req, res) => {
       (SELECT count(*)::int FROM installment_plans WHERE status = 'overdue') AS overdue_count,
       (SELECT count(*)::int FROM installment_schedules WHERE status = 'due-soon') AS due_soon_count,
       (SELECT COALESCE(sum(amount), 0)::numeric FROM payments) AS total_revenue,
-      (SELECT COALESCE(sum(markup_earned), 0)::numeric FROM installment_schedules) AS total_profit
+      (SELECT COALESCE(sum(markup_earned), 0)::numeric FROM installment_schedules) AS total_profit,
+      (SELECT COALESCE(sum(purchase_cost), 0)::numeric FROM installment_plans) AS total_purchase_cost,
+      (SELECT COALESCE(sum(principal_amount - purchase_cost), 0)::numeric FROM installment_plans) AS total_cost_gap
   `);
   const row = result.rows[0];
   return ok(res, {
@@ -31,6 +33,8 @@ router.get('/summary', asyncHandler(async (_req, res) => {
     dueSoonCount: row.due_soon_count,
     totalRevenue: Number(row.total_revenue),
     totalProfit: Number(row.total_profit),
+    totalPurchaseCost: Number(row.total_purchase_cost),
+    totalCostGap: Number(row.total_cost_gap),
   });
 }));
 

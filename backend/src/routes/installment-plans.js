@@ -74,16 +74,21 @@ router.get('/:id', asyncHandler(async (req, res) => {
 }));
 
 router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
-  const required = ['customerId', 'principalAmount', 'downPayment', 'numberOfInstallments', 'installmentAmount', 'frequency', 'startDate'];
+  const required = ['customerId', 'principalAmount', 'purchaseCost', 'downPayment', 'numberOfInstallments', 'installmentAmount', 'frequency', 'startDate'];
   const missing = required.filter((field) => req.body?.[field] === undefined || req.body?.[field] === '');
   if (missing.length) return fail(res, 400, `Missing required fields: ${missing.join(', ')}.`);
 
   const id = newId('plan');
   const principalAmount    = Number(req.body.principalAmount);
+  const purchaseCost       = Number(req.body.purchaseCost ?? req.body.principalAmount || 0);
   const downPayment        = Number(req.body.downPayment);
   const installmentAmount  = Number(req.body.installmentAmount);
   const numInstallments    = Number(req.body.numberOfInstallments);
   const interestRate       = Number(req.body.interestOrMarkup || 0); // percentage, e.g. 5.4
+
+  if (purchaseCost < 0 || purchaseCost > principalAmount) {
+    return fail(res, 400, 'Purchase cost must be zero or positive and cannot exceed the invoice price.');
+  }
   const netFinanced        = Math.max(principalAmount - downPayment, 0);
   const totalMarkup        = Number((netFinanced * interestRate / 100).toFixed(2)); // total rupee markup
   const markupShare        = totalMarkup / numInstallments;           // per-installment rupee markup
@@ -97,12 +102,12 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
 
     const inserted = await client.query(
       `INSERT INTO installment_plans
-       (id, customer_id, product_id, principal_amount, down_payment, number_of_installments,
+       (id, customer_id, product_id, principal_amount, purchase_cost, down_payment, number_of_installments,
         installment_amount, frequency, start_date, status, interest_or_markup, markup_amount, outstanding_balance, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'active',$10,$11,$12,$13)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'active',$11,$12,$13,$14)
        RETURNING *`,
       [
-        id, req.body.customerId, req.body.productId || null, req.body.principalAmount, req.body.downPayment,
+        id, req.body.customerId, req.body.productId || null, req.body.principalAmount, purchaseCost, req.body.downPayment,
         req.body.numberOfInstallments, req.body.installmentAmount, req.body.frequency, req.body.startDate,
         interestRate, totalMarkup, outstandingBalance, req.user.id,
       ]

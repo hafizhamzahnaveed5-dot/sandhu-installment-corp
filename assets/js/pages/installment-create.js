@@ -85,8 +85,13 @@ export default async function init() {
         <div id="step-2-content" class="hidden">
           <div class="form-grid">
             <div class="form-group">
-              <label class="form-label" for="plan-principal">Principal Loan Amount <span class="required">*</span></label>
+              <label class="form-label" for="plan-principal">Invoice / Sale Price <span class="required">*</span></label>
               <input type="number" id="plan-principal" class="form-control" required min="1000" placeholder="e.g. 50000"/>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="plan-purchase-cost">Actual Purchase Cost <span class="required">*</span></label>
+              <input type="number" id="plan-purchase-cost" class="form-control" required min="0" placeholder="e.g. 45000"/>
             </div>
 
             <div class="form-group">
@@ -167,7 +172,7 @@ export default async function init() {
   });
 
   // Financial inputs listener
-  ['plan-principal', 'plan-downpayment', 'plan-markup', 'plan-duration'].forEach(id => {
+  ['plan-principal', 'plan-purchase-cost', 'plan-downpayment', 'plan-markup', 'plan-duration'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', recalculate);
   });
 
@@ -200,11 +205,17 @@ export default async function init() {
     const customerId = document.getElementById('plan-customer').value;
     const productId = document.getElementById('plan-product').value;
     const principalAmount = parseFloat(principalInput.value);
-    const downPayment = parseFloat(document.getElementById('plan-downpayment').value);
-    const markupRate = parseFloat(document.getElementById('plan-markup').value);
-    const duration = parseInt(document.getElementById('plan-duration').value);
+    const purchaseCost = parseFloat(document.getElementById('plan-purchase-cost').value) || 0;
+    const downPayment = parseFloat(document.getElementById('plan-downpayment').value) || 0;
+    const markupRate = parseFloat(document.getElementById('plan-markup').value) || 0;
+    const duration = parseInt(document.getElementById('plan-duration').value) || 12;
     const frequency = document.getElementById('plan-frequency').value;
     const startDate = document.getElementById('plan-startdate').value;
+
+    if (purchaseCost > principalAmount) {
+      Toast.warning('Validation error', 'Purchase cost cannot exceed invoice / sale price.');
+      return;
+    }
 
     const netFinanced = principalAmount - downPayment;
     const markupAmt = netFinanced * (markupRate / 100);
@@ -217,6 +228,7 @@ export default async function init() {
       customerId,
       productId: productId || null,
       principalAmount,
+      purchaseCost,
       downPayment,
       numberOfInstallments: duration,
       installmentAmount: principalInstallment,
@@ -241,17 +253,21 @@ export default async function init() {
 
   function recalculate() {
     const principal = parseFloat(principalInput.value) || 0;
+    const purchaseCost = parseFloat(document.getElementById('plan-purchase-cost').value) || 0;
     const downPayment = parseFloat(document.getElementById('plan-downpayment').value) || 0;
     const markupPercent = parseFloat(document.getElementById('plan-markup').value) || 0;
     const duration = parseInt(document.getElementById('plan-duration').value) || 12;
 
     const net = Math.max(0, principal - downPayment);
     const markup = net * (markupPercent / 100);
+    const costGap = principal - purchaseCost;
     const principalInstallment = Math.ceil(net / duration);
     const markupInstallment = markup / duration;
     const totalInstallment = principalInstallment + markupInstallment;
 
     document.getElementById('summary-net').textContent = formatCurrency(net);
+    document.getElementById('summary-purchase-cost').textContent = formatCurrency(purchaseCost);
+    document.getElementById('summary-cost-gap').textContent = formatCurrency(costGap);
     document.getElementById('summary-markup').textContent = formatCurrency(markup);
     document.getElementById('summary-installment').textContent = formatCurrency(totalInstallment);
   }

@@ -127,6 +127,8 @@ async function refreshAll() {
     if (grid) grid.innerHTML = [
       { label: 'Monthly Collections', value: formatCurrency(d.monthlyCollection, true), icon: '💰', color: 'var(--color-accent-green)', bg: 'var(--color-accent-green-dim)', link: '#/payments' },
       { label: 'Active Plans', value: d.activePlans, icon: '📋', color: 'var(--color-accent-blue)', bg: 'var(--color-accent-blue-dim)', link: '#/installments' },
+      { label: 'Total Purchase Cost', value: formatCurrency(d.totalPurchaseCost, true), icon: '📦', color: 'var(--color-accent-yellow)', bg: 'rgba(255,198,0,0.12)', link: '#/reports?view=costs' },
+      { label: 'Total Cost Gap', value: formatCurrency(d.totalCostGap, true), icon: '📈', color: 'var(--color-accent-orange)', bg: 'rgba(255,148,0,0.12)', link: '#/reports?view=costs' },
       { label: 'Overdue Alerts', value: d.overdueCount, icon: '⚠️', color: 'var(--color-accent-red)', bg: 'var(--color-accent-red-dim)', link: '#/installments' },
     ].map(k => `
       <a href="${k.link}" class="stat-card" style="text-decoration:none;--accent-color:${k.color}">

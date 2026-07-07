@@ -22,7 +22,7 @@ router.get('/', asyncHandler(async (req, res) => {
   }
   if (req.query.search) {
     values.push(`%${req.query.search}%`);
-    where.push(`(full_name ILIKE $${values.length} OR phone ILIKE $${values.length} OR city ILIKE $${values.length})`);
+    where.push(`(full_name ILIKE $${values.length} OR phone ILIKE $${values.length} OR city ILIKE $${values.length} OR account_number ILIKE $${values.length})`);
   }
   if (req.query.status) {
     values.push(req.query.status);
@@ -53,6 +53,7 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
   const customer = {
     id: newId('cust'),
     fullName,
+    accountNumber: req.body.accountNumber || null,
     cnicOrId: req.body.cnicOrId || null,
     phone,
     email: req.body.email || null,
@@ -68,14 +69,21 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
     notes: req.body.notes || null,
   };
 
+  if (customer.accountNumber) {
+    const existing = await pool.query('SELECT id FROM customers WHERE account_number = $1', [customer.accountNumber]);
+    if (existing.rowCount) {
+      return fail(res, 409, 'Account Number already exists. Please choose a unique Account Number.');
+    }
+  }
+
   const row = await withTransaction(async (client) => {
     const inserted = await client.query(
       `INSERT INTO customers
-       (id, full_name, cnic_or_id, phone, email, address, city, status, guarantor_name, guarantor_phone, documents, credit_score, total_outstanding, sms_alerts_enabled, notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+       (id, full_name, account_number, cnic_or_id, phone, email, address, city, status, guarantor_name, guarantor_phone, documents, credit_score, total_outstanding, sms_alerts_enabled, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
        RETURNING *`,
       [
-        customer.id, customer.fullName, customer.cnicOrId, customer.phone, customer.email, customer.address,
+        customer.id, customer.fullName, customer.accountNumber, customer.cnicOrId, customer.phone, customer.email, customer.address,
         customer.city, customer.status, customer.guarantorName, customer.guarantorPhone,
         JSON.stringify(customer.documents), customer.creditScore, customer.totalOutstanding, customer.smsAlertsEnabled, customer.notes,
       ]
@@ -95,12 +103,12 @@ router.put('/:id', requireMinRole('manager'), asyncHandler(async (req, res) => {
   const row = await withTransaction(async (client) => {
     const updated = await client.query(
       `UPDATE customers SET
-        full_name=$2, cnic_or_id=$3, phone=$4, email=$5, address=$6, city=$7, status=$8,
-        guarantor_name=$9, guarantor_phone=$10, documents=$11, credit_score=$12,
-        total_outstanding=$13, sms_alerts_enabled=$14, notes=$15, updated_at=now()
+        full_name=$2, account_number=$3, cnic_or_id=$4, phone=$5, email=$6, address=$7, city=$8, status=$9,
+        guarantor_name=$10, guarantor_phone=$11, documents=$12, credit_score=$13,
+        total_outstanding=$14, sms_alerts_enabled=$15, notes=$16, updated_at=now()
        WHERE id=$1 RETURNING *`,
       [
-        req.params.id, source.fullName, source.cnicOrId, source.phone, source.email, source.address,
+        req.params.id, source.fullName, source.accountNumber || null, source.cnicOrId, source.phone, source.email, source.address,
         source.city, source.status, source.guarantorName, source.guarantorPhone,
         JSON.stringify(source.documents || []), source.creditScore || 0, source.totalOutstanding || 0,
         source.smsAlertsEnabled ?? true, source.notes,

@@ -63,7 +63,9 @@ export default async function init() {
             <tr>
               <th>Plan ID</th>
               <th>Customer</th>
-              <th>Principal</th>
+              <th>Invoice</th>
+              <th>Cost</th>
+              <th>Gap</th>
               <th>Inst. Amount</th>
               <th>Frequency</th>
               <th>Status</th>
@@ -130,7 +132,7 @@ function renderTable(plans) {
 
   if (plans.length === 0) {
     tbody.innerHTML = `
-      <tr><td colspan="8">
+      <tr><td colspan="10">
         <div class="empty-state">
           <span style="font-size:40px">📋</span>
           <h3>No plans found</h3>
@@ -149,6 +151,8 @@ function renderTable(plans) {
         <div style="font-weight:500">${p.customerName}</div>
       </td>
       <td style="font-weight:600;font-family:var(--font-mono)">${formatCurrency(p.principalAmount)}</td>
+      <td style="font-weight:600;font-family:var(--font-mono)">${formatCurrency(p.purchaseCost)}</td>
+      <td style="font-weight:600;font-family:var(--font-mono)">${formatCurrency(p.costGap)}</td>
       <td style="font-family:var(--font-mono)">${formatCurrency(p.installmentAmount)}</td>
       <td class="secondary">${capitalize(p.frequency)}</td>
       <td><span class="badge badge-${p.status}">${capitalize(p.status)}</span></td>

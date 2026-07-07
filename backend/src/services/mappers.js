@@ -3,6 +3,7 @@ export function mapCustomer(row) {
   return {
     id: row.id,
     fullName: row.full_name,
+    accountNumber: row.account_number || null,
     cnicOrId: row.cnic_or_id,
     phone: row.phone,
     email: row.email,
@@ -22,12 +23,16 @@ export function mapCustomer(row) {
 
 export function mapPlan(row) {
   if (!row) return null;
+  const principalAmount = Number(row.principal_amount);
+  const purchaseCost = Number(row.purchase_cost || 0);
   return {
     id: row.id,
     customerId: row.customer_id,
     customerName: row.customer_name,
     productId: row.product_id,
-    principalAmount: Number(row.principal_amount),
+    principalAmount,
+    purchaseCost,
+    costGap: principalAmount - purchaseCost,
     downPayment: Number(row.down_payment),
     numberOfInstallments: Number(row.number_of_installments),
     installmentAmount: Number(row.installment_amount),

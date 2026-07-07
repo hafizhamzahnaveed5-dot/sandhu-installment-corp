@@ -237,6 +237,9 @@ function renderPlanCard(plan) {
           </div>
           <div style="font-size:24px;font-weight:700;color:var(--color-text-primary)">${formatCurrency(plan.principalAmount)} <span style="font-size:14px;font-weight:500;color:var(--color-text-tertiary)">+ ${formatCurrency(plan.markupAmount)} markup</span></div>
           <div style="font-size:13px;color:var(--color-text-secondary);margin-top:4px">
+            Purchase Cost: ${formatCurrency(plan.purchaseCost)} • Cost Gap: ${formatCurrency(plan.costGap)}
+          </div>
+          <div style="font-size:13px;color:var(--color-text-secondary);margin-top:4px">
             ${plan.numberOfInstallments} × ${formatCurrency(plan.installmentAmount + (plan.markupAmount / plan.numberOfInstallments))} / ${plan.frequency}
             &nbsp;·&nbsp; Started ${formatDate(plan.startDate)}
           </div>

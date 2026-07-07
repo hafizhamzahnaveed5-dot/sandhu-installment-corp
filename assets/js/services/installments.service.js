@@ -69,6 +69,7 @@ const InstallmentsService = {
       await delay(600);
       const plan = {
         ...payload,
+        costGap: (payload.principalAmount || 0) - (payload.purchaseCost || 0),
         id: `plan-${Date.now()}`,
         status: 'active',
         createdAt: new Date().toISOString(),
@@ -199,6 +200,8 @@ const InstallmentsService = {
       const monthPayments = mockPayments.filter(p => p.paidAt.startsWith(thisMonth));
       const monthlyCollection = monthPayments.reduce((s, p) => s + p.amount, 0);
       const dueSoonCount = mockSchedule.filter(s => s.status === 'due-soon').length;
+      const totalPurchaseCost = activePlans.reduce((sum, plan) => sum + (plan.purchaseCost || 0), 0);
+      const totalCostGap = activePlans.reduce((sum, plan) => sum + ((plan.principalAmount || 0) - (plan.purchaseCost || 0)), 0);
 
       return {
         success: true,
@@ -211,6 +214,8 @@ const InstallmentsService = {
           overdueCount: overduePlans.length,
           dueSoonCount,
           totalRevenue: mockPayments.reduce((s, p) => s + p.amount, 0),
+          totalPurchaseCost,
+          totalCostGap,
         },
         error: null,
       };

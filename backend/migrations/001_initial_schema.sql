@@ -69,6 +69,7 @@ CREATE TABLE installment_plans (
   customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
   product_id TEXT REFERENCES products(id) ON DELETE SET NULL,
   principal_amount NUMERIC(12,2) NOT NULL CHECK (principal_amount > 0),
+  purchase_cost NUMERIC(12,2) NOT NULL DEFAULT 0,
   down_payment NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (down_payment >= 0),
   number_of_installments INTEGER NOT NULL CHECK (number_of_installments > 0),
   installment_amount NUMERIC(12,2) NOT NULL CHECK (installment_amount > 0),
