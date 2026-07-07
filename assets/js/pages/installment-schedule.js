@@ -312,6 +312,9 @@ function showPaymentModal(schedId, number, amount, planId, onSuccess) {
       method,
       notes,
     });
+    confirmBtn.classList.remove('loading');
+
+    if (result.success) {
       Toast.success('Success', 'Payment recorded successfully.');
       modal.destroy();
       onSuccess();
@@ -320,6 +323,7 @@ function showPaymentModal(schedId, number, amount, planId, onSuccess) {
     }
   });
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Settlement Modal — fetches live breakdown, shows confirmation
