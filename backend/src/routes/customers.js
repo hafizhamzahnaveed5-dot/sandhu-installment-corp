@@ -122,6 +122,18 @@ router.delete('/:id', requireMinRole('manager'), asyncHandler(async (req, res) =
     return fail(res, 409, 'This customer has active installment plans and cannot be deleted. Resolve or cancel those plans first.');
   }
 
+  const planHistory = await pool.query(
+    'SELECT id FROM installment_plans WHERE customer_id = $1 LIMIT 1',
+    [req.params.id]
+  );
+  const paymentHistory = await pool.query(
+    'SELECT id FROM payments WHERE customer_id = $1 LIMIT 1',
+    [req.params.id]
+  );
+  if (planHistory.rowCount || paymentHistory.rowCount) {
+    return fail(res, 409, 'This customer has installment history and cannot be permanently deleted. Mark them inactive instead.');
+  }
+
   const row = await withTransaction(async (client) => {
     const deleted = await client.query('DELETE FROM customers WHERE id = $1 RETURNING *', [req.params.id]);
     if (!deleted.rowCount) return null;

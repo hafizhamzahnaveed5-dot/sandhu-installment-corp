@@ -39,6 +39,9 @@ export function createApp() {
   app.use((_req, res) => fail(res, 404, 'Endpoint not found.'));
   app.use((error, _req, res, _next) => {
     console.error(error);
+    if (error?.status && typeof error.message === 'string') {
+      return fail(res, error.status, error.message);
+    }
     return fail(res, 500, 'Internal server error.');
   });
 

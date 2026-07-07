@@ -149,7 +149,7 @@ export function openCustomerFormModal({ mode = 'add', customer = null, onSaved =
   modal.backdrop.querySelector('#delete-customer-btn')?.addEventListener('click', async () => {
     const ok = await Modal.confirm(
       'Delete Customer?',
-      'Are you sure? This cannot be undone. Customers with open installment plans cannot be deleted.'
+      'Are you sure? This cannot be undone. Customers with installment history cannot be permanently deleted.'
     );
     if (!ok) return;
 

@@ -135,12 +135,20 @@ const CustomersService = {
       return { success: true, data: deletedCustomer, error: null };
     }
 
-    const result = await api.delete(`/customers/${id}`);
-    if (result.success) {
-      await AuditService.log('DELETE', 'Customer', id, `Deleted customer ID: ${id}`);
-      EventBus.emit('customer:deleted', { id });
+    try {
+      const result = await api.delete(`/customers/${id}`);
+      if (result.success) {
+        await AuditService.log('DELETE', 'Customer', id, `Deleted customer ID: ${id}`);
+        EventBus.emit('customer:deleted', { id });
+      }
+      return result;
+    } catch (err) {
+      return {
+        success: false,
+        data: null,
+        error: err?.body?.error || err?.message || 'Unable to delete customer.',
+      };
     }
-    return result;
   },
 };
 
