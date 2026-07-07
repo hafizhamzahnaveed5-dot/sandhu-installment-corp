@@ -132,6 +132,14 @@ export default async function init() {
               <span class="info-value" id="summary-net">PKR 0</span>
             </div>
             <div class="info-row">
+              <span class="info-label">Purchase Cost:</span>
+              <span class="info-value" id="summary-purchase-cost">PKR 0</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Cost Gap:</span>
+              <span class="info-value" id="summary-cost-gap">PKR 0</span>
+            </div>
+            <div class="info-row">
               <span class="info-label">Markup Amount:</span>
               <span class="info-value" id="summary-markup">PKR 0</span>
             </div>
