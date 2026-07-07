@@ -113,15 +113,25 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
       ]
     );
 
+    const today = new Date().toISOString().slice(0, 10);
+    const dueSoonCutoff = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
     for (let i = 1; i <= numInstallments; i += 1) {
       const principalDue = i === numInstallments
         ? Number((netFinanced - principalShare * (numInstallments - 1)).toFixed(2))
         : principalShare;
+      const dueDate = addPeriod(req.body.startDate, req.body.frequency, i - 1);
+      const initialStatus = dueDate < today
+        ? 'overdue'
+        : dueDate <= dueSoonCutoff
+          ? 'due-soon'
+          : 'pending';
+
       await client.query(
         `INSERT INTO installment_schedules
          (id, plan_id, installment_number, due_date, amount_due, amount_paid, principal_due, principal_paid, markup_amount, markup_earned, status)
-         VALUES ($1,$2,$3,$4,$5,0,$6,0,$7,0,'pending')`,
-        [newId('sch'), id, i, addPeriod(req.body.startDate, req.body.frequency, i - 1), amountDuePerInstallment, principalDue, markupShare]
+         VALUES ($1,$2,$3,$4,$5,0,$6,0,$7,0,$8)`,
+        [newId('sch'), id, i, dueDate, amountDuePerInstallment, principalDue, markupShare, initialStatus]
       );
     }
 

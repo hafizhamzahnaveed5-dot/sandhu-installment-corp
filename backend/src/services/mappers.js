@@ -16,6 +16,8 @@ export function mapCustomer(row) {
     documents: row.documents || [],
     creditScore: Number(row.credit_score || 0),
     totalOutstanding: Number(row.total_outstanding || 0),
+    totalPurchaseCost: Number(row.total_purchase_cost || 0),
+    totalCostGap: Number(row.total_cost_gap || 0),
     smsAlertsEnabled: row.sms_alerts_enabled ?? true,
     notes: row.notes,
   };
@@ -51,6 +53,21 @@ export function mapPlan(row) {
   };
 }
 
+function computeScheduleStatus(row) {
+  const rawStatus = String(row.status || '').trim();
+  if (['paid', 'settled', 'partial'].includes(rawStatus)) return rawStatus;
+
+  const dueDate = row.due_date?.toISOString?.().slice(0, 10) || String(row.due_date || '');
+  if (!dueDate) return rawStatus || 'pending';
+
+  const today = new Date().toISOString().slice(0, 10);
+  const dueSoonCutoff = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  if (dueDate < today) return 'overdue';
+  if (dueDate <= dueSoonCutoff) return 'due-soon';
+  return rawStatus || 'pending';
+}
+
 export function mapSchedule(row) {
   if (!row) return null;
   return {
@@ -65,7 +82,7 @@ export function mapSchedule(row) {
     markupAmount: Number(row.markup_amount || 0),
     markupEarned: Number(row.markup_earned || 0),
     markupWaived: Number(row.markup_waived || 0),
-    status: row.status,
+    status: computeScheduleStatus(row),
     paidDate: row.paid_date?.toISOString?.() || row.paid_date,
     closedReason: row.closed_reason,
   };

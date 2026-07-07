@@ -16,8 +16,8 @@ router.get('/summary', asyncHandler(async (_req, res) => {
       (SELECT count(*)::int FROM installment_plans WHERE status = 'active') AS active_plans,
       (SELECT COALESCE(sum(total_outstanding), 0)::numeric FROM customers) AS total_outstanding,
       (SELECT COALESCE(sum(amount), 0)::numeric FROM payments WHERE date_trunc('month', paid_at) = date_trunc('month', now())) AS monthly_collection,
-      (SELECT count(*)::int FROM installment_plans WHERE status = 'overdue') AS overdue_count,
-      (SELECT count(*)::int FROM installment_schedules WHERE status = 'due-soon') AS due_soon_count,
+      (SELECT count(*)::int FROM installment_schedules s WHERE s.status NOT IN ('paid', 'settled') AND s.due_date < CURRENT_DATE) AS overdue_count,
+      (SELECT count(*)::int FROM installment_schedules s WHERE s.status NOT IN ('paid', 'settled') AND s.due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '2 days') AS due_soon_count,
       (SELECT COALESCE(sum(amount), 0)::numeric FROM payments) AS total_revenue,
       (SELECT COALESCE(sum(markup_earned), 0)::numeric FROM installment_schedules) AS total_profit,
       (SELECT COALESCE(sum(purchase_cost), 0)::numeric FROM installment_plans) AS total_purchase_cost,
@@ -62,7 +62,8 @@ router.get('/today-due', asyncHandler(async (_req, res) => {
      FROM installment_schedules s
      JOIN installment_plans p ON p.id = s.plan_id
      JOIN customers c ON c.id = p.customer_id
-     WHERE s.due_date = CURRENT_DATE OR s.status IN ('due-soon', 'overdue')
+     WHERE s.status NOT IN ('paid', 'settled')
+       AND s.due_date <= CURRENT_DATE + INTERVAL '2 days'
      ORDER BY s.due_date ASC
      LIMIT 10`
   );
