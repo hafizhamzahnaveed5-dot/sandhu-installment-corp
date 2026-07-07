@@ -65,7 +65,7 @@ function renderShell(user) {
     </div>
 
     <!-- KPI Grid: skeleton while loading, replaced by refreshKPIs() -->
-    <div class="kpi-grid" id="dash-kpi-grid" style="grid-template-columns:repeat(5,1fr)">
+    <div class="kpi-grid" id="dash-kpi-grid" style="grid-template-columns:repeat(7,1fr)">
       ${[1,2,3,4,5].map(() => `
         <div class="stat-card">
           <div class="skeleton" style="height:80px;border-radius:var(--radius-sm)"></div>
@@ -263,6 +263,26 @@ function refreshKPIs(summaryRes) {
         <line x1="12" y1="8" x2="12" y2="12"/>
         <line x1="12" y1="16" x2="12.01" y2="16"/>
       </svg>`,
+    },
+    {
+      label: 'Total Purchase Cost',
+      value: formatCurrency(d.totalPurchaseCost, true),
+      change: 'Across all plans',
+      changeDir: 'up',
+      link: '#/customers?view=costs',
+      color: 'var(--color-accent-yellow)',
+      bg: 'rgba(255,198,0,0.12)',
+      icon: `<span style="font-size:20px">📦</span>`,
+    },
+    {
+      label: 'Total Cost Gap',
+      value: formatCurrency(d.totalCostGap, true),
+      change: 'Principal vs cost',
+      changeDir: 'up',
+      link: '#/customers?view=costs',
+      color: 'var(--color-accent-orange)',
+      bg: 'rgba(255,148,0,0.12)',
+      icon: `<span style="font-size:20px">📈</span>`,
     },
   ];
 
