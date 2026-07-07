@@ -90,7 +90,7 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
     return fail(res, 400, 'Purchase cost must be zero or positive and cannot exceed the invoice price.');
   }
   const netFinanced        = Math.max(principalAmount - downPayment, 0);
-  const totalMarkup        = Number((netFinanced * interestRate / 100).toFixed(2)); // total rupee markup
+  const totalMarkup        = Number((principalAmount * interestRate / 100).toFixed(2)); // total rupee markup (on full invoice price, not net financed)
   const markupShare        = totalMarkup / numInstallments;           // per-installment rupee markup
   const amountDuePerInstallment = installmentAmount + markupShare;    // principal share + markup share
   const outstandingBalance = (installmentAmount * numInstallments) + totalMarkup;

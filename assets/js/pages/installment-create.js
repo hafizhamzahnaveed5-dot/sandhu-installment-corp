@@ -226,7 +226,7 @@ export default async function init() {
     }
 
     const netFinanced = principalAmount - downPayment;
-    const markupAmt = netFinanced * (markupRate / 100);
+    const markupAmt = principalAmount * (markupRate / 100); // markup on full invoice price
     const principalInstallment = Math.ceil(netFinanced / duration);
 
     btn.classList.add('loading');
@@ -267,7 +267,7 @@ export default async function init() {
     const duration = parseInt(document.getElementById('plan-duration').value) || 12;
 
     const net = Math.max(0, principal - downPayment);
-    const markup = net * (markupPercent / 100);
+    const markup = principal * (markupPercent / 100); // markup on full invoice price, not net financed
     const costGap = principal - purchaseCost;
     const principalInstallment = Math.ceil(net / duration);
     const markupInstallment = markup / duration;
