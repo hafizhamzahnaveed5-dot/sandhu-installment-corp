@@ -42,6 +42,32 @@ const ProductsService = {
   },
 
   /**
+   * Create a new category
+   */
+  async createCategory(name, parentCategoryId = null) {
+    if (Config.FEATURE_FLAGS.MOCK_MODE) {
+      await delay(300);
+      const cat = { id: `cat-${Date.now()}`, name, parentCategoryId };
+      MOCK_CATEGORIES.push(cat);
+      return { success: true, data: cat, error: null };
+    }
+    return api.post('/categories', { name, parentCategoryId });
+  },
+
+  /**
+   * Delete a category by id
+   */
+  async deleteCategory(id) {
+    if (Config.FEATURE_FLAGS.MOCK_MODE) {
+      await delay(300);
+      const idx = MOCK_CATEGORIES.findIndex(c => c.id === id);
+      if (idx !== -1) MOCK_CATEGORIES.splice(idx, 1);
+      return { success: true, data: null, error: null };
+    }
+    return api.delete(`/categories/${id}`);
+  },
+
+  /**
    * Create a new product
    */
   async create(payload) {

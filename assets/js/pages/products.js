@@ -341,7 +341,7 @@ function showManageCategoriesModal() {
   modal.open();
 
   const tbody = modal.backdrop.querySelector('#cats-tbody');
-  
+
   const updateList = () => {
     tbody.innerHTML = state.categories.map(c => `
       <tr>
@@ -351,26 +351,42 @@ function showManageCategoriesModal() {
         </td>
       </tr>
     `).join('');
-    
+
     tbody.querySelectorAll('.remove-cat-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const id = btn.dataset.id;
-        state.categories = state.categories.filter(c => c.id !== id);
-        updateList();
-        renderPage();
+        btn.classList.add('loading');
+        const result = await ProductsService.deleteCategory(id);
+        if (result.success) {
+          state.categories = state.categories.filter(c => c.id !== id);
+          updateList();
+          renderPage();
+        } else {
+          btn.classList.remove('loading');
+          Toast.error('Delete Failed', result.error || 'Could not delete category.');
+        }
       });
     });
   };
 
-  modal.backdrop.querySelector('#add-cat-action').addEventListener('click', () => {
+  modal.backdrop.querySelector('#add-cat-action').addEventListener('click', async () => {
     const input = modal.backdrop.querySelector('#new-cat-name');
     const name = input.value.trim();
     if (!name) return;
 
-    state.categories.push({ id: `cat-${Date.now()}`, name, parentCategoryId: null });
-    input.value = '';
-    updateList();
-    renderPage();
+    const addBtn = modal.backdrop.querySelector('#add-cat-action');
+    addBtn.classList.add('loading');
+
+    const result = await ProductsService.createCategory(name);
+    if (result.success) {
+      state.categories.push(result.data);
+      input.value = '';
+      updateList();
+      renderPage();
+    } else {
+      Toast.error('Create Failed', result.error || 'Could not create category.');
+    }
+    addBtn.classList.remove('loading');
   });
 
   updateList();

@@ -5,7 +5,7 @@
 import { renderNavbar } from '../components/navbar.js';
 import CustomersService from '../services/customers.service.js';
 import InstallmentsService from '../services/installments.service.js';
-import { MOCK_PRODUCTS } from '../mock/products.mock.js';
+import ProductsService from '../services/products.service.js';
 import Toast from '../components/toast.js';
 import { formatCurrency } from '../config.js';
 
@@ -14,10 +14,13 @@ export default async function init() {
 
   const content = document.getElementById('page-content');
 
-  // Load customer lists for selection dropdown
-  const customersRes = await CustomersService.list({ pageSize: 999 });
+  // Load customer and product lists for selection dropdown
+  const [customersRes, productsRes] = await Promise.all([
+    CustomersService.list({ pageSize: 999 }),
+    ProductsService.list()
+  ]);
   const customers = customersRes.data || [];
-  const products = MOCK_PRODUCTS;
+  const products = productsRes.data || [];
 
   // Extract URL parameters if preselected
   const urlParams = new URLSearchParams(window.location.hash.split('?')[1]);
