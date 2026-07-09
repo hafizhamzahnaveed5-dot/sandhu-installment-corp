@@ -81,21 +81,20 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
   const round2 = (value) => Number(Number(value || 0).toFixed(2));
   const id = newId('plan');
   const principalAmount    = Number(req.body.principalAmount);
-  const originalPrincipal  = Number(req.body.originalPrincipalAmount ?? principalAmount);
   const discountAmount     = Number(req.body.discountAmount ?? 0);
   const purchaseCost       = Number(req.body.purchaseCost ?? req.body.principalAmount ?? 0);
   const downPayment        = Number(req.body.downPayment);
   const installmentAmount  = Number(req.body.installmentAmount);
   const interestRate       = Number(req.body.interestOrMarkup || 0); // percentage, e.g. 5.4
 
-  if (discountAmount < 0 || discountAmount > originalPrincipal) {
-    return fail(res, 400, 'Discount amount must be zero or less than or equal to the invoice price.');
+  if (discountAmount < 0) {
+    return fail(res, 400, 'Discount amount must be zero or a positive number.');
   }
-  if (principalAmount !== round2(Math.max(originalPrincipal - discountAmount, 0))) {
-    return fail(res, 400, 'Discounted principal does not match original amount minus discount.');
+  if (discountAmount > principalAmount) {
+    return fail(res, 400, 'Discount amount cannot exceed the invoice price.');
   }
   if (purchaseCost < 0 || purchaseCost > principalAmount) {
-    return fail(res, 400, 'Purchase cost must be zero or positive and cannot exceed the discounted invoice price.');
+    return fail(res, 400, 'Purchase cost must be zero or positive and cannot exceed the invoice price.');
   }
   if (installmentAmount <= 0) {
     return fail(res, 400, 'Installment amount must be greater than 0.');
@@ -103,8 +102,33 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
 
   const netFinanced        = round2(Math.max(principalAmount - downPayment, 0));
   const totalMarkup        = round2(principalAmount * interestRate / 100);
-  const totalPayable       = round2(netFinanced + totalMarkup);
+  const grossPayable       = round2(netFinanced + totalMarkup);
+  if (discountAmount >= grossPayable) {
+    return fail(res, 400, 'Discount cannot be greater than or equal to the total payable amount.');
+  }
 
+  if (grossPayable <= 0) {
+    return fail(res, 400, 'Total payable amount must be greater than 0.');
+  }
+
+  const regularInstallments = Math.floor(grossPayable / installmentAmount);
+  const remainder = round2(grossPayable - (regularInstallments * installmentAmount));
+  const numberOfInstallments = remainder > 0 ? regularInstallments + 1 : regularInstallments;
+  const scheduleAmounts = Array(regularInstallments).fill(installmentAmount);
+  if (remainder > 0) scheduleAmounts.push(remainder);
+  if (scheduleAmounts.length === 0 && grossPayable > 0) scheduleAmounts.push(grossPayable);
+
+  let discountRemaining = discountAmount;
+  for (let i = scheduleAmounts.length - 1; i >= 0 && discountRemaining > 0; i -= 1) {
+    const reduction = Math.min(scheduleAmounts[i], discountRemaining);
+    scheduleAmounts[i] = round2(scheduleAmounts[i] - reduction);
+    discountRemaining = round2(discountRemaining - reduction);
+  }
+  if (discountRemaining > 0) {
+    return fail(res, 400, 'Discount cannot be applied without making the last installment invalid.');
+  }
+
+  const totalPayable = round2(scheduleAmounts.reduce((sum, amount) => sum + amount, 0));
   if (totalPayable <= 0) {
     return fail(res, 400, 'Total payable amount must be greater than 0.');
   }
@@ -112,11 +136,6 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
     return fail(res, 400, 'Installment amount cannot be greater than total amount.');
   }
 
-  const regularInstallments = Math.floor(totalPayable / installmentAmount);
-  const remainder = round2(totalPayable - (regularInstallments * installmentAmount));
-  const numberOfInstallments = remainder > 0 ? regularInstallments + 1 : regularInstallments;
-  const scheduleAmounts = Array(regularInstallments).fill(installmentAmount);
-  if (remainder > 0) scheduleAmounts.push(remainder);
   const outstandingBalance = totalPayable;
 
   let markupAllocated = 0;

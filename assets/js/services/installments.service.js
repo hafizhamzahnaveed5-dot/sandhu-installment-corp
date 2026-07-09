@@ -76,12 +76,31 @@ const InstallmentsService = {
       const installmentAmount = Number(payload.installmentAmount || 0);
       const netFinanced = round2(Math.max(principalAmount - downPayment, 0));
       const totalMarkup = round2(principalAmount * (markupRate / 100));
-      const totalPayable = round2(netFinanced + totalMarkup);
-      const regularInstallments = installmentAmount > 0 ? Math.floor(totalPayable / installmentAmount) : 0;
-      const remainder = round2(totalPayable - (regularInstallments * installmentAmount));
+      const grossPayable = round2(netFinanced + totalMarkup);
+      if (discountAmount >= grossPayable) {
+        return { success: false, data: null, error: 'Discount cannot be greater than or equal to the total payable amount.' };
+      }
+      if (installmentAmount <= 0) {
+        return { success: false, data: null, error: 'Installment amount must be greater than 0.' };
+      }
+
+      const regularInstallments = installmentAmount > 0 ? Math.floor(grossPayable / installmentAmount) : 0;
+      const remainder = round2(grossPayable - (regularInstallments * installmentAmount));
       const scheduleAmounts = Array(regularInstallments).fill(installmentAmount);
       if (remainder > 0) scheduleAmounts.push(remainder);
-      if (scheduleAmounts.length === 0 && totalPayable > 0) scheduleAmounts.push(totalPayable);
+      if (scheduleAmounts.length === 0 && grossPayable > 0) scheduleAmounts.push(grossPayable);
+
+      let discountRemaining = discountAmount;
+      for (let i = scheduleAmounts.length - 1; i >= 0 && discountRemaining > 0; i -= 1) {
+        const reduction = Math.min(scheduleAmounts[i], discountRemaining);
+        scheduleAmounts[i] = round2(scheduleAmounts[i] - reduction);
+        discountRemaining = round2(discountRemaining - reduction);
+      }
+      if (discountRemaining > 0) {
+        return { success: false, data: null, error: 'Discount cannot be applied without making the last installment invalid.' };
+      }
+
+      const totalPayable = round2(scheduleAmounts.reduce((sum, amount) => sum + amount, 0));
 
       let markupAllocated = 0;
       const scheduleRows = scheduleAmounts.map((amountDue, idx) => {
