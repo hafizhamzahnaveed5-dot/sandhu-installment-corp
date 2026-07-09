@@ -80,13 +80,21 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
 
   const id = newId('plan');
   const principalAmount    = Number(req.body.principalAmount);
+  const originalPrincipal  = Number(req.body.originalPrincipalAmount ?? principalAmount);
+  const discountAmount     = Number(req.body.discountAmount || 0);
   const purchaseCost       = Number(req.body.purchaseCost ?? req.body.principalAmount ?? 0);
   const downPayment        = Number(req.body.downPayment);
   const installmentAmount  = Number(req.body.installmentAmount);
   const interestRate       = Number(req.body.interestOrMarkup || 0); // percentage, e.g. 5.4
 
+  if (discountAmount < 0 || discountAmount > originalPrincipal) {
+    return fail(res, 400, 'Discount amount must be zero or less than or equal to the invoice price.');
+  }
+  if (principalAmount !== round2(Math.max(originalPrincipal - discountAmount, 0))) {
+    return fail(res, 400, 'Discounted principal does not match original amount minus discount.');
+  }
   if (purchaseCost < 0 || purchaseCost > principalAmount) {
-    return fail(res, 400, 'Purchase cost must be zero or positive and cannot exceed the invoice price.');
+    return fail(res, 400, 'Purchase cost must be zero or positive and cannot exceed the discounted invoice price.');
   }
   if (installmentAmount <= 0) {
     return fail(res, 400, 'Installment amount must be greater than 0.');
@@ -132,13 +140,13 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
     const inserted = await client.query(
       `INSERT INTO installment_plans
        (id, customer_id, product_id, principal_amount, purchase_cost, down_payment, number_of_installments,
-        installment_amount, frequency, start_date, status, interest_or_markup, markup_amount, outstanding_balance, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'active',$11,$12,$13,$14)
+        installment_amount, frequency, start_date, status, interest_or_markup, markup_amount, outstanding_balance, discount_amount, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'active',$11,$12,$13,$14,$15)
        RETURNING *`,
       [
         id, req.body.customerId, req.body.productId || null, req.body.principalAmount, purchaseCost, req.body.downPayment,
         numberOfInstallments, req.body.installmentAmount, req.body.frequency, req.body.startDate,
-        interestRate, totalMarkup, outstandingBalance, req.user.id,
+        interestRate, totalMarkup, outstandingBalance, discountAmount, req.user.id,
       ]
     );
 

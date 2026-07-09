@@ -90,6 +90,15 @@ export default async function init() {
             </div>
 
             <div class="form-group">
+              <label class="form-label" for="plan-discount">Discount Amount</label>
+              <div style="display:flex;gap:12px;align-items:center">
+                <input type="number" id="plan-discount" class="form-control" min="0" step="0.01" value="0" placeholder="e.g. 1000" />
+                <button type="button" class="btn btn-secondary" id="btn-apply-discount" style="flex-shrink:0">Apply Discount</button>
+              </div>
+              <small class="form-help">Enter a discount to reduce the plan total from the invoice price.</small>
+            </div>
+
+            <div class="form-group">
               <label class="form-label" for="plan-purchase-cost">Actual Purchase Cost <span class="required">*</span></label>
               <input type="number" id="plan-purchase-cost" class="form-control" required min="0" placeholder="e.g. 45000"/>
             </div>
@@ -134,6 +143,14 @@ export default async function init() {
             <div class="info-row">
               <span class="info-label">Purchase Cost:</span>
               <span class="info-value" id="summary-purchase-cost">PKR 0</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Discount Amount:</span>
+              <span class="info-value" id="summary-discount">PKR 0</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Adjusted Invoice Price:</span>
+              <span class="info-value" id="summary-adjusted-principal">PKR 0</span>
             </div>
             <div class="info-row">
               <span class="info-label">Cost Gap:</span>
@@ -184,8 +201,20 @@ export default async function init() {
   });
 
   // Financial inputs listener
-  ['plan-principal', 'plan-purchase-cost', 'plan-downpayment', 'plan-markup', 'plan-installment-amount'].forEach(id => {
+  ['plan-principal', 'plan-discount', 'plan-purchase-cost', 'plan-downpayment', 'plan-markup', 'plan-installment-amount'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', recalculate);
+  });
+
+  document.getElementById('btn-apply-discount')?.addEventListener('click', () => {
+    const principal = parseFloat(principalInput.value) || 0;
+    const discount = parseFloat(document.getElementById('plan-discount').value) || 0;
+
+    if (discount > principal) {
+      Toast.warning('Validation', 'Discount cannot exceed the invoice price.');
+      return;
+    }
+
+    recalculate();
   });
 
   // Navigation Logic
@@ -218,24 +247,29 @@ export default async function init() {
     const productId = document.getElementById('plan-product').value;
     const principalAmount = parseFloat(principalInput.value);
     const purchaseCost = parseFloat(document.getElementById('plan-purchase-cost').value) || 0;
+    const discountAmount = parseFloat(document.getElementById('plan-discount').value) || 0;
     const downPayment = parseFloat(document.getElementById('plan-downpayment').value) || 0;
     const markupRate = parseFloat(document.getElementById('plan-markup').value) || 0;
     const installmentAmount = parseFloat(document.getElementById('plan-installment-amount').value);
     const frequency = document.getElementById('plan-frequency').value;
     const startDate = document.getElementById('plan-startdate').value;
 
-    if (purchaseCost > principalAmount) {
-      Toast.warning('Validation error', 'Purchase cost cannot exceed invoice / sale price.');
+    if (discountAmount < 0 || discountAmount > principalAmount) {
+      Toast.warning('Validation error', 'Discount must be between 0 and the invoice price.');
       return;
     }
-
+    if (purchaseCost > principalAmount - discountAmount) {
+      Toast.warning('Validation error', 'Purchase cost cannot exceed the discounted invoice price.');
+      return;
+    }
     if (isNaN(installmentAmount) || installmentAmount <= 0) {
       Toast.warning('Validation error', 'Installment amount must be greater than 0.');
       return;
     }
 
-    const netFinanced = Math.max(principalAmount - downPayment, 0);
-    const totalMarkup = Number((principalAmount * (markupRate / 100)).toFixed(2));
+    const effectivePrincipal = Number((principalAmount - discountAmount).toFixed(2));
+    const netFinanced = Math.max(effectivePrincipal - downPayment, 0);
+    const totalMarkup = Number((effectivePrincipal * (markupRate / 100)).toFixed(2));
     const totalPayable = Number((netFinanced + totalMarkup).toFixed(2));
 
     if (installmentAmount > totalPayable) {
@@ -249,7 +283,9 @@ export default async function init() {
     const result = await InstallmentsService.createPlan({
       customerId,
       productId: productId || null,
-      principalAmount,
+      principalAmount: effectivePrincipal,
+      originalPrincipalAmount: principalAmount,
+      discountAmount,
       purchaseCost,
       downPayment,
       installmentAmount,
@@ -283,9 +319,11 @@ export default async function init() {
     const markupPercent = parseFloat(document.getElementById('plan-markup').value) || 0;
     const installmentAmount = parseFloat(document.getElementById('plan-installment-amount')?.value) || 0;
 
-    const net = round2(Math.max(principal - downPayment, 0));
-    const markup = round2(principal * (markupPercent / 100));
-    const costGap = round2(principal - purchaseCost);
+    const discount = round2(Math.max(parseFloat(document.getElementById('plan-discount').value) || 0, 0));
+    const effectivePrincipal = round2(Math.max(principal - discount, 0));
+    const net = round2(Math.max(effectivePrincipal - downPayment, 0));
+    const markup = round2(effectivePrincipal * (markupPercent / 100));
+    const costGap = round2(effectivePrincipal - purchaseCost);
     const totalPayable = round2(net + markup);
 
     let preview = 'Enter installment amount to see plan preview.';
@@ -307,6 +345,8 @@ export default async function init() {
 
     document.getElementById('summary-net').textContent = formatCurrency(net);
     document.getElementById('summary-purchase-cost').textContent = formatCurrency(purchaseCost);
+    document.getElementById('summary-discount').textContent = formatCurrency(discount);
+    document.getElementById('summary-adjusted-principal').textContent = formatCurrency(effectivePrincipal);
     document.getElementById('summary-cost-gap').textContent = formatCurrency(costGap);
     document.getElementById('summary-markup').textContent = formatCurrency(markup);
     document.getElementById('summary-installment').textContent = installmentAmount > 0 ? formatCurrency(installmentAmount) : 'PKR 0';

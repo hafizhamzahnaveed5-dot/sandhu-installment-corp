@@ -42,6 +42,7 @@ export function mapPlan(row) {
     startDate: row.start_date?.toISOString?.().slice(0, 10) || row.start_date,
     status: row.status,
     interestOrMarkup: Number(row.interest_or_markup),
+    discountAmount: Number(row.discount_amount || 0),
     markupAmount: Number(row.markup_amount || 0),
     markupWaived: Number(row.markup_waived || 0),
     markupEarned: Number(row.total_markup_earned || 0),
