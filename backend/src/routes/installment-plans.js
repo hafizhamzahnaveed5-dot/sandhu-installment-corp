@@ -74,7 +74,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
 }));
 
 router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
-  const required = ['customerId', 'principalAmount', 'purchaseCost', 'downPayment', 'numberOfInstallments', 'installmentAmount', 'frequency', 'startDate'];
+  const required = ['customerId', 'principalAmount', 'purchaseCost', 'downPayment', 'installmentAmount', 'frequency', 'startDate'];
   const missing = required.filter((field) => req.body?.[field] === undefined || req.body?.[field] === '');
   if (missing.length) return fail(res, 400, `Missing required fields: ${missing.join(', ')}.`);
 
@@ -83,18 +83,47 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
   const purchaseCost       = Number(req.body.purchaseCost ?? req.body.principalAmount ?? 0);
   const downPayment        = Number(req.body.downPayment);
   const installmentAmount  = Number(req.body.installmentAmount);
-  const numInstallments    = Number(req.body.numberOfInstallments);
   const interestRate       = Number(req.body.interestOrMarkup || 0); // percentage, e.g. 5.4
 
   if (purchaseCost < 0 || purchaseCost > principalAmount) {
     return fail(res, 400, 'Purchase cost must be zero or positive and cannot exceed the invoice price.');
   }
-  const netFinanced        = Math.max(principalAmount - downPayment, 0);
-  const totalMarkup        = Number((principalAmount * interestRate / 100).toFixed(2)); // total rupee markup (on full invoice price, not net financed)
-  const markupShare        = totalMarkup / numInstallments;           // per-installment rupee markup
-  const amountDuePerInstallment = installmentAmount + markupShare;    // principal share + markup share
-  const outstandingBalance = (installmentAmount * numInstallments) + totalMarkup;
-  const principalShare     = Number((netFinanced / numInstallments).toFixed(2));
+  if (installmentAmount <= 0) {
+    return fail(res, 400, 'Installment amount must be greater than 0.');
+  }
+
+  const round2 = (value) => Number(Number(value || 0).toFixed(2));
+  const netFinanced        = round2(Math.max(principalAmount - downPayment, 0));
+  const totalMarkup        = round2(principalAmount * interestRate / 100);
+  const totalPayable       = round2(netFinanced + totalMarkup);
+
+  if (totalPayable <= 0) {
+    return fail(res, 400, 'Total payable amount must be greater than 0.');
+  }
+  if (installmentAmount > totalPayable) {
+    return fail(res, 400, 'Installment amount cannot be greater than total amount.');
+  }
+
+  const regularInstallments = Math.floor(totalPayable / installmentAmount);
+  const remainder = round2(totalPayable - (regularInstallments * installmentAmount));
+  const numberOfInstallments = remainder > 0 ? regularInstallments + 1 : regularInstallments;
+  const scheduleAmounts = Array(regularInstallments).fill(installmentAmount);
+  if (remainder > 0) scheduleAmounts.push(remainder);
+  const outstandingBalance = totalPayable;
+
+  let markupAllocated = 0;
+  const scheduleRows = scheduleAmounts.map((amountDue, idx) => {
+    const isLast = idx === scheduleAmounts.length - 1;
+    const markupAmount = isLast
+      ? round2(totalMarkup - markupAllocated)
+      : round2(totalMarkup * (amountDue / totalPayable));
+    markupAllocated = round2(markupAllocated + markupAmount);
+    const principalDue = round2(amountDue - markupAmount);
+    if (principalDue < 0) {
+      throw Object.assign(new Error('Installment amount is too small to cover markup.'), { status: 400 });
+    }
+    return { amountDue, markupAmount, principalDue };
+  });
 
   const row = await withTransaction(async (client) => {
     const customer = await client.query('SELECT id FROM customers WHERE id = $1', [req.body.customerId]);
@@ -108,7 +137,7 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
        RETURNING *`,
       [
         id, req.body.customerId, req.body.productId || null, req.body.principalAmount, purchaseCost, req.body.downPayment,
-        req.body.numberOfInstallments, req.body.installmentAmount, req.body.frequency, req.body.startDate,
+        numberOfInstallments, req.body.installmentAmount, req.body.frequency, req.body.startDate,
         interestRate, totalMarkup, outstandingBalance, req.user.id,
       ]
     );
@@ -116,11 +145,8 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
     const today = new Date().toISOString().slice(0, 10);
     const dueSoonCutoff = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-    for (let i = 1; i <= numInstallments; i += 1) {
-      const principalDue = i === numInstallments
-        ? Number((netFinanced - principalShare * (numInstallments - 1)).toFixed(2))
-        : principalShare;
-      const dueDate = addPeriod(req.body.startDate, req.body.frequency, i - 1);
+    for (let i = 0; i < scheduleRows.length; i += 1) {
+      const dueDate = addPeriod(req.body.startDate, req.body.frequency, i);
       const initialStatus = dueDate < today
         ? 'overdue'
         : dueDate <= dueSoonCutoff
@@ -131,7 +157,7 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
         `INSERT INTO installment_schedules
          (id, plan_id, installment_number, due_date, amount_due, amount_paid, principal_due, principal_paid, markup_amount, markup_earned, status)
          VALUES ($1,$2,$3,$4,$5,0,$6,0,$7,0,$8)`,
-        [newId('sch'), id, i, dueDate, amountDuePerInstallment, principalDue, markupShare, initialStatus]
+        [newId('sch'), id, i + 1, dueDate, scheduleRows[i].amountDue, scheduleRows[i].principalDue, scheduleRows[i].markupAmount, initialStatus]
       );
     }
 

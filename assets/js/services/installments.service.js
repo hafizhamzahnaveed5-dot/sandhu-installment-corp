@@ -67,31 +67,59 @@ const InstallmentsService = {
   async createPlan(payload) {
     if (Config.FEATURE_FLAGS.MOCK_MODE) {
       await delay(600);
+      const round2 = (value) => Number(Number(value || 0).toFixed(2));
+      const principalAmount = Number(payload.principalAmount || 0);
+      const purchaseCost = Number(payload.purchaseCost || 0);
+      const downPayment = Number(payload.downPayment || 0);
+      const markupRate = Number(payload.interestOrMarkup || 0);
+      const installmentAmount = Number(payload.installmentAmount || 0);
+      const netFinanced = round2(Math.max(principalAmount - downPayment, 0));
+      const totalMarkup = round2(principalAmount * (markupRate / 100));
+      const totalPayable = round2(netFinanced + totalMarkup);
+      const regularInstallments = installmentAmount > 0 ? Math.floor(totalPayable / installmentAmount) : 0;
+      const remainder = round2(totalPayable - (regularInstallments * installmentAmount));
+      const scheduleAmounts = Array(regularInstallments).fill(installmentAmount);
+      if (remainder > 0) scheduleAmounts.push(remainder);
+      if (scheduleAmounts.length === 0 && totalPayable > 0) scheduleAmounts.push(totalPayable);
+
+      let markupAllocated = 0;
+      const scheduleRows = scheduleAmounts.map((amountDue, idx) => {
+        const isLast = idx === scheduleAmounts.length - 1;
+        const markupAmount = isLast
+          ? round2(totalMarkup - markupAllocated)
+          : round2(totalMarkup * (amountDue / totalPayable));
+        markupAllocated = round2(markupAllocated + markupAmount);
+        const principalDue = round2(amountDue - markupAmount);
+        return { amountDue, markupAmount, principalDue };
+      });
+
       const plan = {
         ...payload,
-        costGap: (payload.principalAmount || 0) - (payload.purchaseCost || 0),
+        costGap: principalAmount - purchaseCost,
+        numberOfInstallments: scheduleRows.length,
         id: `plan-${Date.now()}`,
         status: 'active',
         createdAt: new Date().toISOString(),
       };
-      // Generate schedule rows
       const start = new Date(plan.startDate);
-      for (let i = 1; i <= plan.numberOfInstallments; i++) {
+
+      for (let i = 0; i < scheduleRows.length; i++) {
         const dueDate = new Date(start);
-        if (plan.frequency === 'monthly') dueDate.setMonth(dueDate.getMonth() + (i - 1));
-        else dueDate.setDate(dueDate.getDate() + (i - 1) * 7);
+        if (plan.frequency === 'monthly') dueDate.setMonth(dueDate.getMonth() + i);
+        else dueDate.setDate(dueDate.getDate() + i * 7);
 
         mockSchedule.push({
-          id: `sch-${plan.id}-${i}`,
+          id: `sch-${plan.id}-${i + 1}`,
           planId: plan.id,
-          installmentNumber: i,
+          installmentNumber: i + 1,
           dueDate: dueDate.toISOString().split('T')[0],
-          amountDue: plan.installmentAmount,
+          amountDue: scheduleRows[i].amountDue,
           amountPaid: 0,
           status: 'pending',
           paidDate: null,
         });
       }
+
       mockPlans.push(plan);
       await AuditService.log('CREATE', 'InstallmentPlan', plan.id, `Created plan for customer ${plan.customerId}`);
       EventBus.emit('installment:created', plan);

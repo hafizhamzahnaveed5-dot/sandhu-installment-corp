@@ -105,8 +105,8 @@ export default async function init() {
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="plan-duration">Number of Installments <span class="required">*</span></label>
-              <input type="number" id="plan-duration" class="form-control" required min="1" max="60" value="12"/>
+              <label class="form-label" for="plan-installment-amount">Installment Amount (per payment) <span class="required">*</span></label>
+              <input type="number" id="plan-installment-amount" class="form-control" required min="1" step="0.01" placeholder="e.g. 7000" />
             </div>
 
             <div class="form-group">
@@ -147,6 +147,10 @@ export default async function init() {
               <span class="info-label">Estimated Installment (Principal + Markup):</span>
               <span class="info-value" id="summary-installment" style="font-size:16px;color:var(--color-accent-blue);font-weight:700">PKR 0</span>
             </div>
+            <div class="info-row" style="border-bottom:none;margin-top:12px">
+              <span class="info-label">Installment Preview:</span>
+              <span class="info-value" id="summary-preview" style="font-size:14px;color:var(--color-text-secondary);white-space:normal;max-width:420px">Enter installment amount to see plan preview.</span>
+            </div>
           </div>
 
           <div style="display:flex;justify-content:space-between;margin-top:24px">
@@ -180,7 +184,7 @@ export default async function init() {
   });
 
   // Financial inputs listener
-  ['plan-principal', 'plan-purchase-cost', 'plan-downpayment', 'plan-markup', 'plan-duration'].forEach(id => {
+  ['plan-principal', 'plan-purchase-cost', 'plan-downpayment', 'plan-markup', 'plan-installment-amount'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', recalculate);
   });
 
@@ -216,7 +220,7 @@ export default async function init() {
     const purchaseCost = parseFloat(document.getElementById('plan-purchase-cost').value) || 0;
     const downPayment = parseFloat(document.getElementById('plan-downpayment').value) || 0;
     const markupRate = parseFloat(document.getElementById('plan-markup').value) || 0;
-    const duration = parseInt(document.getElementById('plan-duration').value) || 12;
+    const installmentAmount = parseFloat(document.getElementById('plan-installment-amount').value);
     const frequency = document.getElementById('plan-frequency').value;
     const startDate = document.getElementById('plan-startdate').value;
 
@@ -225,9 +229,19 @@ export default async function init() {
       return;
     }
 
-    const netFinanced = principalAmount - downPayment;
-    const markupAmt = principalAmount * (markupRate / 100); // markup on full invoice price
-    const principalInstallment = Math.ceil(netFinanced / duration);
+    if (isNaN(installmentAmount) || installmentAmount <= 0) {
+      Toast.warning('Validation error', 'Installment amount must be greater than 0.');
+      return;
+    }
+
+    const netFinanced = Math.max(principalAmount - downPayment, 0);
+    const totalMarkup = Number((principalAmount * (markupRate / 100)).toFixed(2));
+    const totalPayable = Number((netFinanced + totalMarkup).toFixed(2));
+
+    if (installmentAmount > totalPayable) {
+      Toast.warning('Validation error', 'Installment amount cannot be greater than total amount.');
+      return;
+    }
 
     btn.classList.add('loading');
     btn.textContent = '';
@@ -238,8 +252,7 @@ export default async function init() {
       principalAmount,
       purchaseCost,
       downPayment,
-      numberOfInstallments: duration,
-      installmentAmount: principalInstallment,
+      installmentAmount,
       frequency,
       startDate,
       interestOrMarkup: markupRate,
@@ -259,24 +272,44 @@ export default async function init() {
     }
   });
 
+  function round2(value) {
+    return Number(Number((value || 0)).toFixed(2));
+  }
+
   function recalculate() {
     const principal = parseFloat(principalInput.value) || 0;
     const purchaseCost = parseFloat(document.getElementById('plan-purchase-cost').value) || 0;
     const downPayment = parseFloat(document.getElementById('plan-downpayment').value) || 0;
     const markupPercent = parseFloat(document.getElementById('plan-markup').value) || 0;
-    const duration = parseInt(document.getElementById('plan-duration').value) || 12;
+    const installmentAmount = parseFloat(document.getElementById('plan-installment-amount')?.value) || 0;
 
-    const net = Math.max(0, principal - downPayment);
-    const markup = principal * (markupPercent / 100); // markup on full invoice price, not net financed
-    const costGap = principal - purchaseCost;
-    const principalInstallment = Math.ceil(net / duration);
-    const markupInstallment = markup / duration;
-    const totalInstallment = principalInstallment + markupInstallment;
+    const net = round2(Math.max(principal - downPayment, 0));
+    const markup = round2(principal * (markupPercent / 100));
+    const costGap = round2(principal - purchaseCost);
+    const totalPayable = round2(net + markup);
+
+    let preview = 'Enter installment amount to see plan preview.';
+    if (installmentAmount > 0) {
+      if (installmentAmount > totalPayable) {
+        preview = 'Installment amount cannot be greater than total amount.';
+      } else {
+        const regularCount = Math.floor(totalPayable / installmentAmount);
+        const remainder = round2(totalPayable - regularCount * installmentAmount);
+        if (regularCount === 0) {
+          preview = `This will create 1 installment of ${formatCurrency(totalPayable)}.`;
+        } else if (remainder === 0) {
+          preview = `This will create ${regularCount} installments of ${formatCurrency(installmentAmount)}.`;
+        } else {
+          preview = `This will create ${regularCount} installments of ${formatCurrency(installmentAmount)} and 1 final installment of ${formatCurrency(remainder)} (Total: ${regularCount + 1} installments).`;
+        }
+      }
+    }
 
     document.getElementById('summary-net').textContent = formatCurrency(net);
     document.getElementById('summary-purchase-cost').textContent = formatCurrency(purchaseCost);
     document.getElementById('summary-cost-gap').textContent = formatCurrency(costGap);
     document.getElementById('summary-markup').textContent = formatCurrency(markup);
-    document.getElementById('summary-installment').textContent = formatCurrency(totalInstallment);
+    document.getElementById('summary-installment').textContent = installmentAmount > 0 ? formatCurrency(installmentAmount) : 'PKR 0';
+    document.getElementById('summary-preview').textContent = preview;
   }
 }
