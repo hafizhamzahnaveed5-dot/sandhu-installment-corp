@@ -247,7 +247,8 @@ export default async function init() {
     const productId = document.getElementById('plan-product').value;
     const principalAmount = parseFloat(principalInput.value);
     const purchaseCost = parseFloat(document.getElementById('plan-purchase-cost').value) || 0;
-    const discountAmount = parseFloat(document.getElementById('plan-discount').value) || 0;
+    const discountAmountRaw = parseFloat(document.getElementById('plan-discount').value);
+    const discountAmount = Number.isFinite(discountAmountRaw) ? discountAmountRaw : 0;
     const downPayment = parseFloat(document.getElementById('plan-downpayment').value) || 0;
     const markupRate = parseFloat(document.getElementById('plan-markup').value) || 0;
     const installmentAmount = parseFloat(document.getElementById('plan-installment-amount').value);

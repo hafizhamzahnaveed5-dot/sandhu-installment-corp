@@ -78,10 +78,11 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
   const missing = required.filter((field) => req.body?.[field] === undefined || req.body?.[field] === '');
   if (missing.length) return fail(res, 400, `Missing required fields: ${missing.join(', ')}.`);
 
+  const round2 = (value) => Number(Number(value || 0).toFixed(2));
   const id = newId('plan');
   const principalAmount    = Number(req.body.principalAmount);
   const originalPrincipal  = Number(req.body.originalPrincipalAmount ?? principalAmount);
-  const discountAmount     = Number(req.body.discountAmount || 0);
+  const discountAmount     = Number(req.body.discountAmount ?? 0);
   const purchaseCost       = Number(req.body.purchaseCost ?? req.body.principalAmount ?? 0);
   const downPayment        = Number(req.body.downPayment);
   const installmentAmount  = Number(req.body.installmentAmount);
@@ -100,7 +101,6 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
     return fail(res, 400, 'Installment amount must be greater than 0.');
   }
 
-  const round2 = (value) => Number(Number(value || 0).toFixed(2));
   const netFinanced        = round2(Math.max(principalAmount - downPayment, 0));
   const totalMarkup        = round2(principalAmount * interestRate / 100);
   const totalPayable       = round2(netFinanced + totalMarkup);

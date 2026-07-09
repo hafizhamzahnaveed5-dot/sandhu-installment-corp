@@ -70,6 +70,7 @@ const InstallmentsService = {
       const round2 = (value) => Number(Number(value || 0).toFixed(2));
       const principalAmount = Number(payload.principalAmount || 0);
       const purchaseCost = Number(payload.purchaseCost || 0);
+      const discountAmount = Number(payload.discountAmount ?? 0);
       const downPayment = Number(payload.downPayment || 0);
       const markupRate = Number(payload.interestOrMarkup || 0);
       const installmentAmount = Number(payload.installmentAmount || 0);
