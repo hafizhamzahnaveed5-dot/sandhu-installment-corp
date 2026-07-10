@@ -10,7 +10,7 @@ router.use(authenticate);
 router.use(requireMinRole('agent'));
 
 function normalizeType(value) {
-  if (value === 'purchase' || value === 'expense') return value;
+  if (value === 'purchase' || value === 'expense' || value === 'payment_received') return value;
   return 'expense';
 }
 
@@ -25,7 +25,7 @@ router.get('/', asyncHandler(async (req, res) => {
   const from = parseDate(req.query.from);
   const to = parseDate(req.query.to);
   const type = String(req.query.type || 'all').toLowerCase();
-  const allowedType = type === 'purchase' || type === 'expense' ? type : 'all';
+  const allowedType = type === 'purchase' || type === 'expense' || type === 'payment_received' ? type : 'all';
 
   const values = [];
   const where = [];
@@ -60,6 +60,7 @@ router.get('/', asyncHandler(async (req, res) => {
     description: row.description,
     amount: Number(row.amount),
     referencePlanId: row.reference_plan_id,
+    referencePaymentId: row.reference_payment_id,
     createdBy: row.created_by,
     createdByName: row.created_by_name,
     createdAt: row.created_at,
@@ -78,6 +79,7 @@ router.get('/summary', asyncHandler(async (req, res) => {
     `SELECT
        COALESCE(SUM(CASE WHEN type = 'purchase' THEN amount ELSE 0 END), 0)::numeric AS purchase_total,
        COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0)::numeric AS expense_total,
+       COALESCE(SUM(CASE WHEN type = 'payment_received' THEN amount ELSE 0 END), 0)::numeric AS payment_total,
        COALESCE(SUM(amount), 0)::numeric AS combined_total
      FROM roznamcha_entries
      WHERE ($1::date IS NULL OR entry_date >= $1)
@@ -88,6 +90,7 @@ router.get('/summary', asyncHandler(async (req, res) => {
     `SELECT
        COALESCE(SUM(CASE WHEN type = 'purchase' THEN amount ELSE 0 END), 0)::numeric AS purchase_total,
        COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0)::numeric AS expense_total,
+       COALESCE(SUM(CASE WHEN type = 'payment_received' THEN amount ELSE 0 END), 0)::numeric AS payment_total,
        COALESCE(SUM(amount), 0)::numeric AS combined_total
      FROM roznamcha_entries
      WHERE entry_date = $1`,
@@ -97,6 +100,7 @@ router.get('/summary', asyncHandler(async (req, res) => {
     `SELECT
        COALESCE(SUM(CASE WHEN type = 'purchase' THEN amount ELSE 0 END), 0)::numeric AS monthly_purchase_total,
        COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0)::numeric AS monthly_expense_total,
+       COALESCE(SUM(CASE WHEN type = 'payment_received' THEN amount ELSE 0 END), 0)::numeric AS monthly_payment_total,
        COALESCE(SUM(amount), 0)::numeric AS monthly_combined_total
      FROM roznamcha_entries
      WHERE entry_date >= $1`,
@@ -109,18 +113,24 @@ router.get('/summary', asyncHandler(async (req, res) => {
     period: {
       purchaseTotal: Number(row.purchase_total || 0),
       expenseTotal: Number(row.expense_total || 0),
+      paymentTotal: Number(row.payment_total || 0),
       combinedTotal: Number(row.combined_total || 0),
+      net: Number((row.payment_total || 0) - ((row.purchase_total || 0) + (row.expense_total || 0))),
       label: dateFilter ? `${from || 'Start'} → ${to || 'Today'}` : 'Selected period',
     },
     today: {
       purchaseTotal: Number(todayRow.purchase_total || 0),
       expenseTotal: Number(todayRow.expense_total || 0),
+      paymentTotal: Number(todayRow.payment_total || 0),
       combinedTotal: Number(todayRow.combined_total || 0),
+      net: Number((todayRow.payment_total || 0) - ((todayRow.purchase_total || 0) + (todayRow.expense_total || 0))),
     },
     thisMonth: {
       purchaseTotal: Number(monthlyRow.monthly_purchase_total || 0),
       expenseTotal: Number(monthlyRow.monthly_expense_total || 0),
+      paymentTotal: Number(monthlyRow.monthly_payment_total || 0),
       combinedTotal: Number(monthlyRow.monthly_combined_total || 0),
+      net: Number((monthlyRow.monthly_payment_total || 0) - ((monthlyRow.monthly_purchase_total || 0) + (monthlyRow.monthly_expense_total || 0))),
     },
   });
 }));

@@ -107,6 +107,20 @@ router.post('/', requireMinRole('agent'), asyncHandler(async (req, res) => {
       ]
     );
 
+    // Create a Roznamcha ledger entry for this payment (payment_received)
+    try {
+      const custRes = await client.query('SELECT full_name FROM customers WHERE id = $1', [scheduleRow.customer_id]);
+      const customerName = custRes.rows[0]?.full_name || null;
+      const entryDate = (req.body.paidAt ? new Date(req.body.paidAt) : new Date()).toISOString().slice(0, 10);
+      await client.query(
+        `INSERT INTO roznamcha_entries (id, entry_date, type, description, amount, reference_plan_id, reference_payment_id, created_by)
+         VALUES ($1, $2, 'payment_received', $3, $4, $5, $6, $7)`,
+        [newId('roz'), entryDate, `Installment payment received from ${customerName || 'customer'} - Plan ${planId}`, amount, planId, inserted.rows[0].id, req.user.id]
+      );
+    } catch (err) {
+      console.error('Roznamcha auto-entry failed for payment:', err);
+    }
+
     if (isEarlySettlement) {
       const waiveResult = await client.query(
         `UPDATE installment_schedules

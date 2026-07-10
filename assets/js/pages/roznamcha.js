@@ -36,7 +36,8 @@ function renderShell() {
       <div class="kpi-grid" id="roz-summary-grid">
         <div class="stat-card"><div class="stat-value" id="roz-purchase-total">Loading...</div><div class="stat-label">Purchases</div></div>
         <div class="stat-card"><div class="stat-value" id="roz-expense-total">Loading...</div><div class="stat-label">Expenses</div></div>
-        <div class="stat-card"><div class="stat-value" id="roz-combined-total">Loading...</div><div class="stat-label">Combined</div></div>
+        <div class="stat-card"><div class="stat-value" id="roz-payment-total">Loading...</div><div class="stat-label">Payments Received</div></div>
+        <div class="stat-card"><div class="stat-value" id="roz-net-total">Loading...</div><div class="stat-label">Net Cash Flow</div></div>
       </div>
       <div id="roz-summary-note" class="secondary" style="margin-top:8px"></div>
     </div>
@@ -59,6 +60,7 @@ function renderShell() {
               <option value="all">All</option>
               <option value="purchase">Purchases</option>
               <option value="expense">Expenses</option>
+              <option value="payment_received">Payments Received</option>
             </select>
           </label>
           <button class="btn btn-ghost" id="apply-filter-btn">Apply</button>
@@ -193,7 +195,8 @@ function renderSummary(summary) {
   const period = summary?.period || {};
   document.getElementById('roz-purchase-total').textContent = formatCurrency(period.purchaseTotal || 0, true);
   document.getElementById('roz-expense-total').textContent = formatCurrency(period.expenseTotal || 0, true);
-  document.getElementById('roz-combined-total').textContent = formatCurrency(period.combinedTotal || 0, true);
+  document.getElementById('roz-payment-total').textContent = formatCurrency(period.paymentTotal || 0, true);
+  document.getElementById('roz-net-total').textContent = formatCurrency(period.net || 0, true);
   document.getElementById('roz-summary-note').textContent = period.label ? `Showing ${period.label}` : 'Showing selected period';
 }
 
@@ -216,13 +219,15 @@ function renderEntries(entries) {
   const dates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
   container.innerHTML = dates.map((date) => {
     const dayEntries = grouped[date];
-    const dayTotal = dayEntries.reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+    const dayIn = dayEntries.filter(e => e.type === 'payment_received').reduce((s, e) => s + Number(e.amount || 0), 0);
+    const dayOut = dayEntries.filter(e => e.type !== 'payment_received').reduce((s, e) => s + Number(e.amount || 0), 0);
+    const dayTotal = dayIn - dayOut;
     return `
       <div class="card" style="margin-bottom:12px;padding:16px;background:var(--color-bg-elevated)">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px">
           <div>
             <div style="font-weight:700">${formatDate(date)}</div>
-            <div class="secondary">${dayEntries.length} entries</div>
+            <div class="secondary">${dayEntries.length} entries · In: ${formatCurrency(dayIn)} · Out: ${formatCurrency(dayOut)}</div>
           </div>
           <div style="font-weight:700;color:var(--color-accent-blue)">${formatCurrency(dayTotal)}</div>
         </div>
@@ -231,12 +236,12 @@ function renderEntries(entries) {
             <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg)">
               <div>
                 <div style="font-weight:600">${entry.description}</div>
-                <div class="secondary" style="margin-top:4px">${entry.type === 'purchase' ? 'Purchase' : 'Expense'}${entry.referencePlanId ? ` · Plan ${entry.referencePlanId}` : ''}</div>
+                <div class="secondary" style="margin-top:4px">${entry.type === 'purchase' ? 'Purchase' : (entry.type === 'expense' ? 'Expense' : 'Payment')}${entry.referencePlanId ? ` · Plan ${entry.referencePlanId}` : ''}</div>
               </div>
               <div style="text-align:right">
-                <div class="badge ${entry.type === 'purchase' ? 'badge-info' : 'badge-danger'}">${entry.type === 'purchase' ? 'Purchase' : 'Expense'}</div>
+                <div class="badge ${entry.type === 'purchase' ? 'badge-info' : (entry.type === 'expense' ? 'badge-danger' : 'badge-success')}">${entry.type === 'purchase' ? 'Purchase' : (entry.type === 'expense' ? 'Expense' : 'Payment')}</div>
                 <div style="margin-top:6px;font-weight:700">${formatCurrency(entry.amount)}</div>
-                ${!entry.referencePlanId ? `
+                ${!entry.referencePlanId && !entry.referencePaymentId ? `
                   <div style="margin-top:8px;display:flex;justify-content:flex-end;gap:8px">
                     <button class="btn btn-ghost btn-sm" data-action="edit" data-id="${entry.id}">Edit</button>
                     <button class="btn btn-ghost btn-sm" data-action="delete" data-id="${entry.id}">Delete</button>
