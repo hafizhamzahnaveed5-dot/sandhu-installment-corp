@@ -21,7 +21,9 @@ router.get('/summary', asyncHandler(async (_req, res) => {
       (SELECT COALESCE(sum(amount), 0)::numeric FROM payments) AS total_revenue,
       (SELECT COALESCE(sum(markup_earned), 0)::numeric FROM installment_schedules) AS total_profit,
       (SELECT COALESCE(sum(purchase_cost), 0)::numeric FROM installment_plans) AS total_purchase_cost,
-      (SELECT COALESCE(sum(principal_amount - purchase_cost), 0)::numeric FROM installment_plans) AS total_cost_gap
+      (SELECT COALESCE(sum(principal_amount - purchase_cost), 0)::numeric FROM installment_plans) AS total_cost_gap,
+      (SELECT COALESCE(SUM(CASE WHEN type = 'purchase' THEN amount ELSE 0 END), 0)::numeric FROM roznamcha_entries WHERE entry_date = CURRENT_DATE) AS roznamcha_purchase_today,
+      (SELECT COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0)::numeric FROM roznamcha_entries WHERE entry_date = CURRENT_DATE) AS roznamcha_expense_today
   `);
   const row = result.rows[0];
   return ok(res, {
@@ -35,6 +37,11 @@ router.get('/summary', asyncHandler(async (_req, res) => {
     totalProfit: Number(row.total_profit),
     totalPurchaseCost: Number(row.total_purchase_cost),
     totalCostGap: Number(row.total_cost_gap),
+    roznamchaToday: {
+      purchaseTotal: Number(row.roznamcha_purchase_today || 0),
+      expenseTotal: Number(row.roznamcha_expense_today || 0),
+      combinedTotal: Number(row.roznamcha_purchase_today || 0) + Number(row.roznamcha_expense_today || 0),
+    },
   });
 }));
 

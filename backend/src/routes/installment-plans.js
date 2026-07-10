@@ -196,6 +196,17 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
        WHERE id = $1`,
       [req.body.customerId]
     );
+
+    try {
+      await client.query(
+        `INSERT INTO roznamcha_entries (id, entry_date, type, description, amount, reference_plan_id, created_by)
+         VALUES ($1, $2, 'purchase', $3, $4, $5, $6)`,
+        [newId('roz'), new Date().toISOString().slice(0, 10), `Purchase cost for plan ${id}`, purchaseCost, id, req.user.id]
+      );
+    } catch (error) {
+      console.error('Roznamcha auto-entry failed for plan creation:', error);
+    }
+
     await writeAudit(client, req.user.id, 'CREATE', 'InstallmentPlan', id, `Created plan for customer ${req.body.customerId}`);
     return inserted.rows[0];
   }).catch((error) => {

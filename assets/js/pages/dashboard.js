@@ -275,14 +275,14 @@ function refreshKPIs(summaryRes) {
       icon: `<span style="font-size:20px">📦</span>`,
     },
     {
-      label: 'Total Cost Gap',
-      value: formatCurrency(d.totalCostGap, true),
-      change: 'Principal vs cost',
+      label: 'Roznamcha',
+      value: formatCurrency((d.roznamchaToday || {}).combinedTotal || 0, true),
+      change: 'Today\'s Ledger',
       changeDir: 'up',
-      link: '#/customers?view=costs',
-      color: 'var(--color-accent-orange)',
-      bg: 'rgba(255,148,0,0.12)',
-      icon: `<span style="font-size:20px">📈</span>`,
+      link: '#/roznamcha',
+      color: 'var(--color-accent-teal)',
+      bg: 'rgba(20,184,166,0.14)',
+      icon: `<span style="font-size:20px">📒</span>`,
     },
   ];
 

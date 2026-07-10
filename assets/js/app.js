@@ -43,6 +43,7 @@ const ROUTES = {
   'payments':            () => import('./pages/payments.js'),
   'payments/:id':        () => import('./pages/receipt.js'),
   'products':            () => import('./pages/products.js'),
+  'roznamcha':           () => import('./pages/roznamcha.js'),
   'reports':             () => import('./pages/reports.js'),
   'analytics':           () => import('./pages/analytics.js'),
   'settings':            () => import('./pages/settings.js'),

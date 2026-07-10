@@ -21,6 +21,7 @@ const NAV_ITEMS = [
     section: 'Business',
     items: [
       { route: 'products',    label: 'Products',     icon: iconProducts() },
+      { route: 'roznamcha',   label: 'Roznamcha',    icon: iconRoznamcha() },
       { route: 'reports',     label: 'Reports',      icon: iconReports() },
       { route: 'analytics',   label: 'Analytics',    icon: iconAnalytics() },
     ],
@@ -159,6 +160,9 @@ function iconReports() {
 }
 function iconAnalytics() {
   return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`;
+}
+function iconRoznamcha() {
+  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M8 7h8"/><path d="M8 12h8"/><path d="M8 17h5"/></svg>`;
 }
 function iconUsers() {
   return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;

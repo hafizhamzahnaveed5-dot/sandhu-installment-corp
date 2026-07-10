@@ -250,6 +250,11 @@ const InstallmentsService = {
       const dueSoonCount = mockSchedule.filter(s => s.status === 'due-soon').length;
       const totalPurchaseCost = activePlans.reduce((sum, plan) => sum + (plan.purchaseCost || 0), 0);
       const totalCostGap = activePlans.reduce((sum, plan) => sum + ((plan.principalAmount || 0) - (plan.purchaseCost || 0)), 0);
+      const roznamchaToday = {
+        purchaseTotal: 0,
+        expenseTotal: 0,
+        combinedTotal: 0,
+      };
 
       return {
         success: true,
@@ -264,6 +269,7 @@ const InstallmentsService = {
           totalRevenue: mockPayments.reduce((s, p) => s + p.amount, 0),
           totalPurchaseCost,
           totalCostGap,
+          roznamchaToday,
         },
         error: null,
       };
