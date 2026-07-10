@@ -38,8 +38,24 @@ router.get('/', asyncHandler(async (req, res) => {
     where.push(`p.customer_id = $${values.length}`);
   }
   if (req.query.status) {
-    values.push(req.query.status);
-    where.push(`p.status = $${values.length}`);
+    if (req.query.status === 'overdue') {
+      where.push(`EXISTS (
+        SELECT 1 FROM installment_schedules s
+        WHERE s.plan_id = p.id
+          AND s.status NOT IN ('paid', 'settled')
+          AND s.due_date < CURRENT_DATE
+      )`);
+    } else if (req.query.status === 'due-soon') {
+      where.push(`EXISTS (
+        SELECT 1 FROM installment_schedules s
+        WHERE s.plan_id = p.id
+          AND s.status NOT IN ('paid', 'settled')
+          AND s.due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '2 days'
+      )`);
+    } else {
+      values.push(req.query.status);
+      where.push(`p.status = $${values.length}`);
+    }
   }
 
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
