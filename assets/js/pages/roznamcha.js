@@ -105,6 +105,8 @@ function bindEvents() {
   });
   document.getElementById('roz-entry-form')?.addEventListener('submit', handleCreate);
   document.getElementById('apply-filter-btn')?.addEventListener('click', () => loadRoznamcha());
+  document.getElementById('filter-from')?.addEventListener('change', () => loadRoznamcha());
+  document.getElementById('filter-to')?.addEventListener('change', () => loadRoznamcha());
   document.getElementById('roz-entry-list')?.addEventListener('click', handleEntryActions);
 }
 
@@ -184,20 +186,40 @@ async function loadRoznamcha() {
 
   const [entriesRes, summaryRes] = await Promise.all([
     api.get('/roznamcha', { from, to, type }),
-    api.get('/roznamcha/summary'),
+    api.get('/roznamcha/summary', { from, to }),
   ]);
 
   if (entriesRes.success) renderEntries(entriesRes.data || []);
-  if (summaryRes.success) renderSummary(summaryRes.data);
+  if (summaryRes.success) renderSummary(summaryRes.data, from, to);
 }
 
-function renderSummary(summary) {
+function renderSummary(summary, from, to) {
   const period = summary?.period || {};
+  const note = buildSummaryNote(from, to);
+
   document.getElementById('roz-purchase-total').textContent = formatCurrency(period.purchaseTotal || 0, true);
   document.getElementById('roz-expense-total').textContent = formatCurrency(period.expenseTotal || 0, true);
   document.getElementById('roz-payment-total').textContent = formatCurrency(period.paymentTotal || 0, true);
-  document.getElementById('roz-net-total').textContent = formatCurrency(period.net || 0, true);
-  document.getElementById('roz-summary-note').textContent = period.label ? `Showing ${period.label}` : 'Showing selected period';
+
+  const netValue = Number(period.net || 0);
+  const netEl = document.getElementById('roz-net-total');
+  if (netEl) {
+    netEl.textContent = formatCurrency(netValue, true);
+    netEl.classList.toggle('text-success', netValue > 0);
+    netEl.classList.toggle('text-danger', netValue < 0);
+    netEl.classList.toggle('text-muted', netValue === 0);
+  }
+
+  document.getElementById('roz-summary-note').textContent = note;
+}
+
+function buildSummaryNote(from, to) {
+  if (from || to) {
+    if (from && to) return `Showing ${formatDate(from)} to ${formatDate(to)}`;
+    if (from) return `Showing ${formatDate(from)} to present`;
+    return `Showing up to ${formatDate(to)}`;
+  }
+  return 'Showing all-time totals';
 }
 
 function renderEntries(entries) {
