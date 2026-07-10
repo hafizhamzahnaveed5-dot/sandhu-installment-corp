@@ -336,22 +336,25 @@ function refreshDueList(dueRes) {
         <thead>
           <tr>
             <th>Customer</th>
-            <th>Amount Due</th>
+            <th>Phone</th>
+            <th>Total Overdue</th>
+            <th>Overdue Count</th>
             <th>Status</th>
-            <th>Due Date</th>
+            <th>Oldest Due</th>
             <th style="text-align:right">Action</th>
           </tr>
         </thead>
         <tbody>
-          ${dueRes.data.map(s => `
-            <tr style="cursor:pointer" onclick="window.location.hash='/installments/${s.planId}'">
-              <td style="font-weight:500">${s.customerName}</td>
-              <td style="font-family:var(--font-mono);font-weight:600">${formatCurrency(s.amountDue)}</td>
-              <td><span class="badge badge-${s.status}">${s.status}</span></td>
-              <td class="secondary">${formatDate(s.dueDate)}</td>
+          ${dueRes.data.map((item) => `
+            <tr style="cursor:pointer" onclick="window.location.hash='/customers/${item.customerId}'">
+              <td style="font-weight:500">${item.customerName}</td>
+              <td class="secondary">${item.customerPhone || '—'}</td>
+              <td style="font-family:var(--font-mono);font-weight:600">${formatCurrency(item.totalOverdueAmount)}</td>
+              <td><span class="badge badge-danger">${item.overdueCount} overdue</span></td>
+              <td><span class="badge badge-overdue">overdue</span></td>
+              <td class="secondary">${formatDate(item.oldestDueDate)}</td>
               <td style="text-align:right">
-                <a href="#/installments/${s.planId}" class="btn btn-sm btn-ghost"
-                   onclick="event.stopPropagation()">View →</a>
+                <a href="#/customers/${item.customerId}" class="btn btn-sm btn-ghost" onclick="event.stopPropagation()">View →</a>
               </td>
             </tr>
           `).join('')}

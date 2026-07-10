@@ -65,19 +65,30 @@ router.get('/collections', asyncHandler(async (req, res) => {
 
 router.get('/today-due', asyncHandler(async (_req, res) => {
   const result = await pool.query(
-    `SELECT s.*, c.full_name AS customer_name, c.phone AS customer_phone
+    `SELECT
+       c.id AS customer_id,
+       c.full_name AS customer_name,
+       c.phone AS customer_phone,
+       COUNT(*)::int AS overdue_count,
+       COALESCE(SUM(GREATEST(s.amount_due - s.amount_paid, 0)), 0)::numeric AS total_overdue_amount,
+       MIN(s.due_date)::date AS oldest_due_date
      FROM installment_schedules s
      JOIN installment_plans p ON p.id = s.plan_id
      JOIN customers c ON c.id = p.customer_id
      WHERE s.status NOT IN ('paid', 'settled')
        AND s.due_date <= CURRENT_DATE + INTERVAL '2 days'
-     ORDER BY s.due_date ASC
+     GROUP BY c.id, c.full_name, c.phone
+     ORDER BY MIN(s.due_date) ASC
      LIMIT 10`
   );
   return ok(res, result.rows.map((row) => ({
-    ...mapSchedule(row),
+    customerId: row.customer_id,
     customerName: row.customer_name,
     customerPhone: row.customer_phone,
+    overdueCount: row.overdue_count,
+    totalOverdueAmount: Number(row.total_overdue_amount),
+    oldestDueDate: row.oldest_due_date,
+    status: 'overdue',
   })));
 }));
 

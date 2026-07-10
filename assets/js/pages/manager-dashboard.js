@@ -127,8 +127,8 @@ async function refreshAll() {
     if (grid) grid.innerHTML = [
       { label: 'Monthly Collections', value: formatCurrency(d.monthlyCollection, true), icon: '💰', color: 'var(--color-accent-green)', bg: 'var(--color-accent-green-dim)', link: '#/payments' },
       { label: 'Active Plans', value: d.activePlans, icon: '📋', color: 'var(--color-accent-blue)', bg: 'var(--color-accent-blue-dim)', link: '#/installments' },
-      { label: 'Total Purchase Cost', value: formatCurrency(d.totalPurchaseCost, true), icon: '📦', color: 'var(--color-accent-yellow)', bg: 'rgba(255,198,0,0.12)', link: '#/reports?view=costs' },
-      { label: 'Total Cost Gap', value: formatCurrency(d.totalCostGap, true), icon: '📈', color: 'var(--color-accent-orange)', bg: 'rgba(255,148,0,0.12)', link: '#/reports?view=costs' },
+      { label: 'Total Purchase Cost', value: formatCurrency(d.totalPurchaseCost, true), icon: '📦', color: 'var(--color-accent-yellow)', bg: 'rgba(255,198,0,0.12)', link: '#/customers?view=costs' },
+      { label: 'Total Cost Gap', value: formatCurrency(d.totalCostGap, true), icon: '📈', color: 'var(--color-accent-orange)', bg: 'rgba(255,148,0,0.12)', link: '#/customers?view=costs' },
       { label: 'Overdue Alerts', value: d.overdueCount, icon: '⚠️', color: 'var(--color-accent-red)', bg: 'var(--color-accent-red-dim)', link: '#/installments' },
     ].map(k => `
       <a href="${k.link}" class="stat-card" style="text-decoration:none;--accent-color:${k.color}">
@@ -165,15 +165,28 @@ async function refreshAll() {
   el.innerHTML = `
     <div class="table-wrapper" style="border:none;border-radius:0">
       <table class="data-table">
-        <thead><tr><th>Customer</th><th>Amount</th><th>Status</th><th style="text-align:right">Action</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>Phone</th>
+            <th>Total Overdue</th>
+            <th>Overdue Count</th>
+            <th>Status</th>
+            <th>Oldest Due</th>
+            <th style="text-align:right">Action</th>
+          </tr>
+        </thead>
         <tbody>
-          ${dueRes.data.map(s => `
-            <tr style="cursor:pointer" onclick="window.location.hash='/installments/${s.planId}'">
-              <td style="font-weight:500">${s.customerName}</td>
-              <td style="font-family:var(--font-mono);font-weight:600">${formatCurrency(s.amountDue)}</td>
-              <td><span class="badge badge-${s.status}">${s.status}</span></td>
+          ${dueRes.data.map((item) => `
+            <tr style="cursor:pointer" onclick="window.location.hash='/customers/${item.customerId}'">
+              <td style="font-weight:500">${item.customerName}</td>
+              <td class="secondary">${item.customerPhone || '—'}</td>
+              <td style="font-family:var(--font-mono);font-weight:600">${formatCurrency(item.totalOverdueAmount)}</td>
+              <td><span class="badge badge-danger">${item.overdueCount} overdue</span></td>
+              <td><span class="badge badge-overdue">overdue</span></td>
+              <td class="secondary">${formatDate(item.oldestDueDate)}</td>
               <td style="text-align:right">
-                <a href="#/installments/${s.planId}" class="btn btn-ghost btn-sm" onclick="event.stopPropagation()">View →</a>
+                <a href="#/customers/${item.customerId}" class="btn btn-ghost btn-sm" onclick="event.stopPropagation()">View →</a>
               </td>
             </tr>
           `).join('')}
