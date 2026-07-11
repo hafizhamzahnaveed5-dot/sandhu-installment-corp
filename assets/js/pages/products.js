@@ -15,18 +15,58 @@ let state = {
   categories: [],
   selectedCategory: '',
   searchQuery: '',
+  page: 1,
+  pageSize: Config.DEFAULT_PAGE_SIZE,
+  total: 0,
+  totalPages: 1,
 };
 
 export default async function init() {
   renderNavbar('Product Catalog', 'Manage inventory and categories');
   
-  const [prodRes, catRes] = await Promise.all([
-    ProductsService.list(),
-    ProductsService.listCategories()
-  ]);
+  try {
+    const catRes = await ProductsService.listCategories();
+    if (catRes.success) {
+      state.categories = catRes.data;
+    } else {
+      Toast.error('Error', catRes.error || 'Failed to load categories.');
+    }
+  } catch (err) {
+    Toast.error('Error', err.body?.error || err.message || 'Failed to load categories.');
+  }
 
-  if (prodRes.success) state.products = prodRes.data;
-  if (catRes.success) state.categories = catRes.data;
+  await loadProducts({ page: 1 });
+}
+
+async function loadProducts({ categoryId = state.selectedCategory, search = state.searchQuery, page = state.page } = {}) {
+  state.selectedCategory = categoryId || '';
+  state.searchQuery = search;
+  state.page = page;
+
+  try {
+    const result = await ProductsService.list({
+      categoryId: categoryId || null,
+      search: state.searchQuery,
+      page: state.page,
+      pageSize: state.pageSize,
+    });
+
+    if (result.success) {
+      state.products = result.data;
+      state.total = result.pagination?.total || 0;
+      state.totalPages = result.pagination?.totalPages || 1;
+    } else {
+      state.products = [];
+      state.total = 0;
+      state.totalPages = 1;
+      Toast.error('Error', result.error || 'Failed to load products.');
+    }
+  } catch (err) {
+    state.products = [];
+    state.total = 0;
+    state.totalPages = 1;
+    Toast.error('Error', err.body?.error || err.message || 'Failed to load products.');
+  }
 
   renderPage();
 }
@@ -34,26 +74,14 @@ export default async function init() {
 function renderPage() {
   const content = document.getElementById('page-content');
   
-  // Filter products
-  let filtered = state.products;
-  if (state.selectedCategory) {
-    filtered = filtered.filter(p => p.categoryId === state.selectedCategory);
-  }
-  if (state.searchQuery) {
-    const q = state.searchQuery.toLowerCase();
-    filtered = filtered.filter(p => 
-      p.name.toLowerCase().includes(q) || 
-      p.sku.toLowerCase().includes(q)
-    );
-  }
-
   const canEdit = AuthService.isAdmin() || AuthService.isManager();
+  const products = state.products || [];
 
   content.innerHTML = `
     <div class="page-header">
       <div class="page-header-left">
         <h1>Product Catalog</h1>
-        <p>${filtered.length} products total</p>
+        <p>Showing ${products.length} of ${state.total} products</p>
       </div>
       <div class="page-header-actions">
         ${canEdit ? `<button class="btn btn-secondary" id="manage-cats-btn">Manage Categories</button>
@@ -80,7 +108,7 @@ function renderPage() {
 
     <!-- Inventory Grid -->
     <div class="grid grid-cols-3 gap-6" style="margin-top:var(--space-6)">
-      ${filtered.map(p => `
+      ${state.products.map(p => `
         <div class="card flex flex-col justify-between" style="position:relative">
           ${canEdit ? `
           <div style="position:absolute;top:16px;right:16px;display:flex;gap:4px">
@@ -112,19 +140,22 @@ function renderPage() {
         </div>
       `).join('')}
     </div>
+
+    <div class="pagination-container" style="margin-top:24px;display:flex;justify-content:space-between;align-items:center">
+      <div id="pagination-info" class="text-secondary"></div>
+      <div class="pagination" id="pagination"></div>
+    </div>
   `;
 
   // Search input
   document.getElementById('prod-search').addEventListener('input', e => {
-    state.searchQuery = e.target.value;
-    renderPage();
+    loadProducts({ search: e.target.value, page: 1 });
   });
 
   // Category filter click
   document.querySelectorAll('.filter-chip[data-cat]').forEach(btn => {
     btn.addEventListener('click', () => {
-      state.selectedCategory = btn.dataset.cat;
-      renderPage();
+      loadProducts({ categoryId: btn.dataset.cat || null, search: state.searchQuery, page: 1 });
     });
   });
 
@@ -146,6 +177,59 @@ function renderPage() {
       });
     });
   }
+
+  renderPagination();
+}
+
+function renderPagination() {
+  const info = document.getElementById('pagination-info');
+  const pag = document.getElementById('pagination');
+  if (!info || !pag) return;
+
+  const start = state.total === 0 ? 0 : (state.page - 1) * state.pageSize + 1;
+  const end = Math.min(state.page * state.pageSize, state.total);
+  info.textContent = state.total === 0 ? 'No products found' : `Showing ${start}–${end} of ${state.total}`;
+
+  if (state.totalPages <= 1) {
+    pag.innerHTML = '';
+    return;
+  }
+
+  const pages = [];
+  for (let i = 1; i <= state.totalPages; i++) {
+    if (i === 1 || i === state.totalPages || (i >= state.page - 1 && i <= state.page + 1)) {
+      pages.push(i);
+    } else if (pages[pages.length - 1] !== '...') {
+      pages.push('...');
+    }
+  }
+
+  pag.innerHTML = `
+    <button class="page-btn" id="prev-btn" ${state.page <= 1 ? 'disabled' : ''}>Prev</button>
+    ${pages.map(p => typeof p === 'number'
+      ? `<button class="page-btn ${p === state.page ? 'active' : ''}" data-page="${p}">${p}</button>`
+      : `<span class="page-separator">${p}</span>`
+    ).join('')}
+    <button class="page-btn" id="next-btn" ${state.page >= state.totalPages ? 'disabled' : ''}>Next</button>
+  `;
+
+  pag.querySelectorAll('.page-btn[data-page]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      loadProducts({ categoryId: state.selectedCategory || null, search: state.searchQuery, page: Number(btn.dataset.page) });
+    });
+  });
+
+  pag.querySelector('#prev-btn')?.addEventListener('click', () => {
+    if (state.page > 1) {
+      loadProducts({ categoryId: state.selectedCategory || null, search: state.searchQuery, page: state.page - 1 });
+    }
+  });
+
+  pag.querySelector('#next-btn')?.addEventListener('click', () => {
+    if (state.page < state.totalPages) {
+      loadProducts({ categoryId: state.selectedCategory || null, search: state.searchQuery, page: state.page + 1 });
+    }
+  });
 }
 
 function showProductModal(product = null) {
@@ -171,6 +255,7 @@ function showProductModal(product = null) {
       <div class="form-group">
         <label class="form-label">Category *</label>
         <select id="p-cat" class="form-control" required>
+          <option value="">Select category</option>
           ${state.categories.map(c => `<option value="${c.id}" ${isEdit && product.categoryId === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
         </select>
       </div>
@@ -235,28 +320,38 @@ function showProductModal(product = null) {
       return;
     }
 
+    if (!categoryId) {
+      Toast.warning('Validation', 'Please select a category.');
+      return;
+    }
+
     const payload = { name, sku, price, stockQty, categoryId, status, description };
     const btn = modal.backdrop.querySelector('#modal-confirm');
     btn.classList.add('loading');
 
-    const result = isEdit 
-      ? await ProductsService.update(product.id, payload)
-      : await ProductsService.create(payload);
+    try {
+      const result = isEdit 
+        ? await ProductsService.update(product.id, payload)
+        : await ProductsService.create(payload);
 
-    if (result.success) {
-      if (isEdit) {
-        const idx = state.products.findIndex(p => p.id === product.id);
-        if (idx !== -1) state.products[idx] = result.data;
-        Toast.success('Product Updated', `${name} saved successfully.`);
+      if (result.success) {
+        if (isEdit) {
+          const idx = state.products.findIndex(p => p.id === product.id);
+          if (idx !== -1) state.products[idx] = result.data;
+          Toast.success('Product Updated', `${name} saved successfully.`);
+        } else {
+          state.products.push(result.data);
+          Toast.success('Inventory Added', `${name} created successfully.`);
+        }
+        modal.destroy();
+        renderPage();
       } else {
-        state.products.push(result.data);
-        Toast.success('Inventory Added', `${name} created successfully.`);
+        Toast.error('Error', result.error || 'An unexpected error occurred.');
       }
-      modal.destroy();
-      renderPage();
-    } else {
+    } catch (err) {
+      Toast.error('Error', err.body?.error || err.message || 'An unexpected error occurred.');
+    } finally {
       btn.classList.remove('loading');
-      Toast.error('Error', result.error);
     }
   });
 }

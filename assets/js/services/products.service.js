@@ -20,14 +20,59 @@ const delay = ms => new Promise(res => setTimeout(res, ms));
 
 const ProductsService = {
   /**
-   * List all products
+   * List all products with optional category filter
+   * @param {string} categoryId - Optional category ID to filter by
    */
-  async list() {
+  async list({ categoryId = null, search = '', status = '', page = 1, pageSize = Config.DEFAULT_PAGE_SIZE } = {}) {
     if (Config.FEATURE_FLAGS.MOCK_MODE) {
       await delay(300);
-      return { success: true, data: [...MOCK_PRODUCTS], error: null };
+      let products = [...MOCK_PRODUCTS];
+      if (categoryId) {
+        products = products.filter(p => p.categoryId === categoryId);
+      }
+      if (status) {
+        products = products.filter(p => p.status === status);
+      }
+      if (search) {
+        const q = search.toLowerCase();
+        products = products.filter(p => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
+      }
+      const total = products.length;
+      const paged = products.slice((page - 1) * pageSize, page * pageSize);
+      return {
+        success: true,
+        data: paged,
+        error: null,
+        pagination: {
+          page,
+          pageSize,
+          total,
+          totalPages: Math.ceil(total / pageSize),
+        },
+      };
     }
-    return api.get('/products');
+
+    const params = { page, pageSize };
+    if (categoryId) params.categoryId = categoryId;
+    if (search) params.search = search;
+    if (status) params.status = status;
+    return api.get('/products', params);
+  },
+
+  async listActive({ search = '', limit = 0 } = {}) {
+    if (Config.FEATURE_FLAGS.MOCK_MODE) {
+      await delay(300);
+      let products = [...MOCK_PRODUCTS].filter(p => p.status === 'active');
+      if (search) {
+        const q = search.toLowerCase();
+        products = products.filter(p => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
+      }
+      return { success: true, data: limit > 0 ? products.slice(0, limit) : products, error: null };
+    }
+    const params = {};
+    if (search) params.search = search;
+    if (limit > 0) params.limit = limit;
+    return api.get('/products/active', params);
   },
 
   /**
@@ -38,7 +83,7 @@ const ProductsService = {
       await delay(200);
       return { success: true, data: [...MOCK_CATEGORIES], error: null };
     }
-    return api.get('/categories');
+    return api.get('/categories', { pageSize: 9999 });
   },
 
   /**

@@ -17,7 +17,7 @@ export default async function init() {
   // Load customer and product lists for selection dropdown
   const [customersRes, productsRes] = await Promise.all([
     CustomersService.list({ pageSize: 999 }),
-    ProductsService.list()
+    ProductsService.listActive()
   ]);
   const customers = customersRes.data || [];
   const products = productsRes.data || [];
