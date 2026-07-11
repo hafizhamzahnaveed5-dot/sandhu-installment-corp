@@ -10,6 +10,27 @@ const router = express.Router();
 
 router.use(authenticate);
 
+router.get('/active', asyncHandler(async (req, res) => {
+  const values = [ 'active' ];
+  const where = [ `status = $1` ];
+
+  if (req.query.search) {
+    values.push(`%${req.query.search}%`);
+    where.push(`(name ILIKE $${values.length} OR sku ILIKE $${values.length})`);
+  }
+
+  const whereSql = `WHERE ${where.join(' AND ')}`;
+  let sql = `SELECT * FROM products ${whereSql} ORDER BY name ASC`;
+  const limit = Number(req.query.limit || 0);
+  if (limit > 0) {
+    sql += ` LIMIT $${values.length + 1}`;
+    values.push(limit);
+  }
+
+  const result = await pool.query(sql, values);
+  return ok(res, result.rows.map(mapProduct));
+}));
+
 router.get('/', asyncHandler(async (req, res) => {
   const { page, pageSize, offset } = paginationParams(req);
   const values = [];
@@ -33,27 +54,6 @@ router.get('/', asyncHandler(async (req, res) => {
     [...values, pageSize, offset]
   );
   return ok(res, result.rows.map(mapProduct), pagination(page, pageSize, count.rows[0].total));
-}));
-
-router.get('/active', asyncHandler(async (req, res) => {
-  const values = [ 'active' ];
-  const where = [ `status = $1` ];
-
-  if (req.query.search) {
-    values.push(`%${req.query.search}%`);
-    where.push(`(name ILIKE $${values.length} OR sku ILIKE $${values.length})`);
-  }
-
-  const whereSql = `WHERE ${where.join(' AND ')}`;
-  let sql = `SELECT * FROM products ${whereSql} ORDER BY name ASC`;
-  const limit = Number(req.query.limit || 0);
-  if (limit > 0) {
-    sql += ` LIMIT $${values.length + 1}`;
-    values.push(limit);
-  }
-
-  const result = await pool.query(sql, values);
-  return ok(res, result.rows.map(mapProduct));
 }));
 
 router.get('/:id', asyncHandler(async (req, res) => {
