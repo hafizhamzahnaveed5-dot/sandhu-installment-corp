@@ -104,6 +104,12 @@ export default async function init() {
             </div>
 
             <div class="form-group">
+              <label class="form-label" for="plan-file-fee">File Fee</label>
+              <input type="number" id="plan-file-fee" class="form-control" min="0" value="0" placeholder="e.g. 500" />
+              <small class="form-help">Optional administrative/file fee added to the total payable amount.</small>
+            </div>
+
+            <div class="form-group">
               <label class="form-label" for="plan-downpayment">Down Payment <span class="required">*</span></label>
               <input type="number" id="plan-downpayment" class="form-control" required min="0" value="0"/>
             </div>
@@ -143,6 +149,10 @@ export default async function init() {
             <div class="info-row">
               <span class="info-label">Purchase Cost:</span>
               <span class="info-value" id="summary-purchase-cost">PKR 0</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">File Fee:</span>
+              <span class="info-value" id="summary-file-fee">PKR 0</span>
             </div>
             <div class="info-row">
               <span class="info-label">Discount Amount:</span>
@@ -205,7 +215,7 @@ export default async function init() {
   });
 
   // Financial inputs listener
-  ['plan-principal', 'plan-discount', 'plan-purchase-cost', 'plan-downpayment', 'plan-markup', 'plan-installment-amount'].forEach(id => {
+  ['plan-principal', 'plan-discount', 'plan-purchase-cost', 'plan-file-fee', 'plan-downpayment', 'plan-markup', 'plan-installment-amount'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', recalculate);
   });
 
@@ -251,6 +261,7 @@ export default async function init() {
     const productId = document.getElementById('plan-product').value;
     const principalAmount = parseFloat(principalInput.value);
     const purchaseCost = parseFloat(document.getElementById('plan-purchase-cost').value) || 0;
+    const fileFee = parseFloat(document.getElementById('plan-file-fee').value) || 0;
     const discountAmountRaw = parseFloat(document.getElementById('plan-discount').value);
     const discountAmount = Number.isFinite(discountAmountRaw) ? discountAmountRaw : 0;
     const downPayment = parseFloat(document.getElementById('plan-downpayment').value) || 0;
@@ -271,6 +282,10 @@ export default async function init() {
       Toast.warning('Validation error', 'Purchase cost cannot exceed the invoice price.');
       return;
     }
+    if (fileFee < 0) {
+      Toast.warning('Validation error', 'File fee cannot be negative.');
+      return;
+    }
     if (isNaN(installmentAmount) || installmentAmount <= 0) {
       Toast.warning('Validation error', 'Installment amount must be greater than 0.');
       return;
@@ -278,7 +293,7 @@ export default async function init() {
 
     const netFinanced = Math.max(principalAmount - downPayment, 0);
     const totalMarkup = Number((principalAmount * (markupRate / 100)).toFixed(2));
-    const grossPayable = Number((netFinanced + totalMarkup).toFixed(2));
+    const grossPayable = Number((netFinanced + totalMarkup + fileFee).toFixed(2));
     const totalPayable = Number((grossPayable - discountAmount).toFixed(2));
 
     if (discountAmount >= grossPayable) {
@@ -300,6 +315,7 @@ export default async function init() {
       principalAmount: principalAmount,
       discountAmount,
       purchaseCost,
+      fileFee,
       downPayment,
       installmentAmount,
       frequency,
@@ -328,6 +344,7 @@ export default async function init() {
   function recalculate() {
     const principal = parseFloat(principalInput.value) || 0;
     const purchaseCost = parseFloat(document.getElementById('plan-purchase-cost').value) || 0;
+    const fileFee = parseFloat(document.getElementById('plan-file-fee').value) || 0;
     const downPayment = parseFloat(document.getElementById('plan-downpayment').value) || 0;
     const markupPercent = parseFloat(document.getElementById('plan-markup').value) || 0;
     const installmentAmount = parseFloat(document.getElementById('plan-installment-amount')?.value) || 0;
@@ -337,7 +354,7 @@ export default async function init() {
     const net = round2(Math.max(invoicePrice - downPayment, 0));
     const markup = round2(invoicePrice * (markupPercent / 100));
     const costGap = round2(invoicePrice - purchaseCost);
-    const grossPayable = round2(net + markup);
+    const grossPayable = round2(net + markup + fileFee);
     const payableRaw = grossPayable - discount;
     const totalPayable = round2(payableRaw > 0 ? payableRaw : 0);
 
@@ -380,6 +397,7 @@ export default async function init() {
 
     document.getElementById('summary-net').textContent = formatCurrency(net);
     document.getElementById('summary-purchase-cost').textContent = formatCurrency(purchaseCost);
+    document.getElementById('summary-file-fee').textContent = formatCurrency(fileFee);
     document.getElementById('summary-discount').textContent = formatCurrency(discount);
     document.getElementById('summary-invoice-price').textContent = formatCurrency(invoicePrice);
     document.getElementById('summary-cost-gap').textContent = formatCurrency(costGap);

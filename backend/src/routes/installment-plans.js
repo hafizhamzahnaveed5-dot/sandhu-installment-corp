@@ -99,6 +99,7 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
   const principalAmount    = Number(req.body.principalAmount);
   const discountAmount     = Number(req.body.discountAmount ?? 0);
   const purchaseCost       = Number(req.body.purchaseCost ?? req.body.principalAmount ?? 0);
+  const fileFee            = Number(req.body.fileFee || 0);
   const downPayment        = Number(req.body.downPayment);
   const installmentAmount  = Number(req.body.installmentAmount);
   const interestRate       = Number(req.body.interestOrMarkup || 0); // percentage, e.g. 5.4
@@ -112,13 +113,16 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
   if (purchaseCost < 0 || purchaseCost > principalAmount) {
     return fail(res, 400, 'Purchase cost must be zero or positive and cannot exceed the invoice price.');
   }
+  if (fileFee < 0) {
+    return fail(res, 400, 'File fee must be zero or a positive number.');
+  }
   if (installmentAmount <= 0) {
     return fail(res, 400, 'Installment amount must be greater than 0.');
   }
 
   const netFinanced        = round2(Math.max(principalAmount - downPayment, 0));
   const totalMarkup        = round2(principalAmount * interestRate / 100);
-  const grossPayable       = round2(netFinanced + totalMarkup);
+  const grossPayable       = round2(netFinanced + totalMarkup + fileFee);
   if (discountAmount >= grossPayable) {
     return fail(res, 400, 'Discount cannot be greater than or equal to the total payable amount.');
   }
@@ -174,12 +178,12 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
 
     const inserted = await client.query(
       `INSERT INTO installment_plans
-       (id, customer_id, product_id, principal_amount, purchase_cost, down_payment, number_of_installments,
+       (id, customer_id, product_id, principal_amount, purchase_cost, file_fee, down_payment, number_of_installments,
         installment_amount, frequency, start_date, status, interest_or_markup, markup_amount, outstanding_balance, discount_amount, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'active',$11,$12,$13,$14,$15)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'active',$12,$13,$14,$15,$16)
        RETURNING *`,
       [
-        id, req.body.customerId, req.body.productId || null, req.body.principalAmount, purchaseCost, req.body.downPayment,
+        id, req.body.customerId, req.body.productId || null, req.body.principalAmount, purchaseCost, fileFee, req.body.downPayment,
         numberOfInstallments, req.body.installmentAmount, req.body.frequency, req.body.startDate,
         interestRate, totalMarkup, outstandingBalance, discountAmount, req.user.id,
       ]

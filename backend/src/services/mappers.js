@@ -34,6 +34,7 @@ export function mapPlan(row) {
     productId: row.product_id,
     principalAmount,
     purchaseCost,
+    fileFee: Number(row.file_fee || 0),
     costGap: principalAmount - purchaseCost,
     downPayment: Number(row.down_payment),
     numberOfInstallments: Number(row.number_of_installments),
