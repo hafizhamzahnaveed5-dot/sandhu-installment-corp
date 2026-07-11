@@ -190,40 +190,42 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
     const customer = await client.query('SELECT id FROM customers WHERE id = $1', [req.body.customerId]);
     if (!customer.rowCount) throw Object.assign(new Error('Customer not found.'), { status: 404 });
 
-    let inserted;
-    try {
-      inserted = await client.query(
-        `INSERT INTO installment_plans
-         (id, customer_id, product_id, principal_amount, purchase_cost, file_fee, down_payment, number_of_installments,
-          installment_amount, frequency, start_date, status, interest_or_markup, markup_amount, outstanding_balance, discount_amount, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'active',$12,$13,$14,$15,$16)
-         RETURNING *`,
-        [
-          id, req.body.customerId, req.body.productId || null, req.body.principalAmount, purchaseCost, fileFee, req.body.downPayment,
-          numberOfInstallments, req.body.installmentAmount, req.body.frequency, req.body.startDate,
-          interestRate, totalMarkup, outstandingBalance, discountAmount, req.user.id,
-        ]
-      );
-    } catch (error) {
-      const translated = translateSqlError(error);
-      if (translated && error.code === '42703' && /file_fee/i.test(error.message)) {
-        // Legacy schema without file_fee column: insert with default zero.
-        inserted = await client.query(
-          `INSERT INTO installment_plans
-           (id, customer_id, product_id, principal_amount, purchase_cost, down_payment, number_of_installments,
-            installment_amount, frequency, start_date, status, interest_or_markup, markup_amount, outstanding_balance, discount_amount, created_by)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'active',$11,$12,$13,$14,$15)
-           RETURNING *`,
-          [
-            id, req.body.customerId, req.body.productId || null, req.body.principalAmount, purchaseCost, req.body.downPayment,
-            numberOfInstallments, req.body.installmentAmount, req.body.frequency, req.body.startDate,
-            interestRate, totalMarkup, outstandingBalance, discountAmount, req.user.id,
-          ]
-        );
-      } else {
-        throw error;
-      }
-    }
+    const fileFeeColumn = await client.query(
+      `SELECT 1 FROM information_schema.columns
+       WHERE table_name = $1 AND column_name = $2
+       LIMIT 1`,
+      ['installment_plans', 'file_fee']
+    );
+    const hasFileFeeColumn = fileFeeColumn.rowCount > 0;
+
+    const insertSqlWithFileFee = `INSERT INTO installment_plans
+      (id, customer_id, product_id, principal_amount, purchase_cost, file_fee, down_payment, number_of_installments,
+       installment_amount, frequency, start_date, status, interest_or_markup, markup_amount, outstanding_balance, discount_amount, created_by)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'active',$12,$13,$14,$15,$16)
+      RETURNING *`;
+
+    const insertSqlWithoutFileFee = `INSERT INTO installment_plans
+      (id, customer_id, product_id, principal_amount, purchase_cost, down_payment, number_of_installments,
+       installment_amount, frequency, start_date, status, interest_or_markup, markup_amount, outstanding_balance, discount_amount, created_by)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'active',$11,$12,$13,$14,$15)
+      RETURNING *`;
+
+    const insertParamsWithFileFee = [
+      id, req.body.customerId, req.body.productId || null, req.body.principalAmount, purchaseCost, fileFee, req.body.downPayment,
+      numberOfInstallments, req.body.installmentAmount, req.body.frequency, req.body.startDate,
+      interestRate, totalMarkup, outstandingBalance, discountAmount, req.user.id,
+    ];
+
+    const insertParamsWithoutFileFee = [
+      id, req.body.customerId, req.body.productId || null, req.body.principalAmount, purchaseCost, req.body.downPayment,
+      numberOfInstallments, req.body.installmentAmount, req.body.frequency, req.body.startDate,
+      interestRate, totalMarkup, outstandingBalance, discountAmount, req.user.id,
+    ];
+
+    const inserted = await client.query(
+      hasFileFeeColumn ? insertSqlWithFileFee : insertSqlWithoutFileFee,
+      hasFileFeeColumn ? insertParamsWithFileFee : insertParamsWithoutFileFee
+    );
 
     const today = new Date().toISOString().slice(0, 10);
     const dueSoonCutoff = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
