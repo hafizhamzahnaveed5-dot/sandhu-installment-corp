@@ -6,7 +6,7 @@
 import { renderNavbar } from '../components/navbar.js';
 import Toast from '../components/toast.js';
 import Modal from '../components/modal.js';
-import { formatCurrency } from '../config.js';
+import { formatCurrency, Config } from '../config.js';
 import ProductsService from '../services/products.service.js';
 import AuthService from '../services/auth.service.js';
 
