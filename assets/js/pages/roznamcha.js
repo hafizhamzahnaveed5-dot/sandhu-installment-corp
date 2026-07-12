@@ -13,8 +13,8 @@ export default async function init() {
 
   const content = document.getElementById('page-content');
   content.innerHTML = renderShell();
-  await loadRoznamcha();
   bindEvents();
+  await loadRoznamcha();
 }
 
 function renderShell() {
@@ -107,6 +107,7 @@ function bindEvents() {
   document.getElementById('apply-filter-btn')?.addEventListener('click', () => loadRoznamcha());
   document.getElementById('filter-from')?.addEventListener('change', () => loadRoznamcha());
   document.getElementById('filter-to')?.addEventListener('change', () => loadRoznamcha());
+  document.getElementById('filter-type')?.addEventListener('change', () => loadRoznamcha());
   document.getElementById('roz-entry-list')?.addEventListener('click', handleEntryActions);
 }
 
@@ -184,13 +185,27 @@ async function loadRoznamcha() {
   const to = document.getElementById('filter-to')?.value || '';
   const type = document.getElementById('filter-type')?.value || 'all';
 
-  const [entriesRes, summaryRes] = await Promise.all([
-    api.get('/roznamcha', { from, to, type }),
-    api.get('/roznamcha/summary', { from, to }),
-  ]);
+  try {
+    const [entriesRes, summaryRes] = await Promise.all([
+      api.get('/roznamcha', { from, to, type }),
+      api.get('/roznamcha/summary', { from, to }),
+    ]);
 
-  if (entriesRes.success) renderEntries(entriesRes.data || []);
-  if (summaryRes.success) renderSummary(summaryRes.data, from, to);
+    if (entriesRes.success) renderEntries(entriesRes.data || []);
+    if (summaryRes.success) renderSummary(summaryRes.data, from, to);
+  } catch (error) {
+    console.error('[Roznamcha] Load failed:', error);
+    Toast.error('Unable to load Roznamcha', error?.message || 'Please check your connection.');
+    const container = document.getElementById('roz-entry-list');
+    if (container) {
+      container.innerHTML = `
+        <div class="empty-state" style="padding:32px">
+          <h3>Unable to load ledger entries</h3>
+          <p>Please check your connection and try again. You can still add a manual expense entry.</p>
+        </div>
+      `;
+    }
+  }
 }
 
 function renderSummary(summary, from, to) {
