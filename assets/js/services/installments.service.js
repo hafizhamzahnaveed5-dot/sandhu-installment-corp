@@ -70,13 +70,14 @@ const InstallmentsService = {
       const round2 = (value) => Number(Number(value || 0).toFixed(2));
       const principalAmount = Number(payload.principalAmount || 0);
       const purchaseCost = Number(payload.purchaseCost || 0);
+      const fileFee = Number(payload.fileFee || 0);
       const discountAmount = Number(payload.discountAmount ?? 0);
       const downPayment = Number(payload.downPayment || 0);
       const markupRate = Number(payload.interestOrMarkup || 0);
       const installmentAmount = Number(payload.installmentAmount || 0);
       const netFinanced = round2(Math.max(principalAmount - downPayment, 0));
       const totalMarkup = round2(principalAmount * (markupRate / 100));
-      const grossPayable = round2(netFinanced + totalMarkup);
+      const grossPayable = round2(netFinanced + totalMarkup + fileFee);
       if (discountAmount >= grossPayable) {
         return { success: false, data: null, error: 'Discount cannot be greater than or equal to the total payable amount.' };
       }
@@ -146,6 +147,29 @@ const InstallmentsService = {
       return { success: true, data: plan, error: null };
     }
     return api.post('/installment-plans', payload);
+  },
+
+  /** Delete a plan if no payment history exists */
+  async deletePlan(id) {
+    if (Config.FEATURE_FLAGS.MOCK_MODE) {
+      await delay(400);
+      const planIdx = mockPlans.findIndex(p => p.id === id);
+      if (planIdx === -1) return { success: false, data: null, error: 'Plan not found.' };
+
+      const hasPayments = mockPayments.some(payment => payment.planId === id);
+      if (hasPayments) {
+        return { success: false, data: null, error: 'This plan has recorded payment history and cannot be deleted.' };
+      }
+
+      mockSchedule = mockSchedule.filter(schedule => schedule.planId !== id);
+      mockPayments = mockPayments.filter(payment => payment.planId !== id);
+      mockPlans.splice(planIdx, 1);
+
+      await AuditService.log('DELETE', 'InstallmentPlan', id, `Deleted plan ${id}`);
+      EventBus.emit('installment:deleted', { id });
+      return { success: true, data: { id }, error: null };
+    }
+    return api.delete(`/installment-plans/${id}`);
   },
 
   /** Get the installment schedule for a plan */

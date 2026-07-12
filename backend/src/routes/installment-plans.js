@@ -103,6 +103,56 @@ router.get('/:id', asyncHandler(async (req, res) => {
   return ok(res, mapPlan(result.rows[0]));
 }));
 
+router.delete('/:id', requireMinRole('manager'), asyncHandler(async (req, res) => {
+  const access = await ensurePlanAccess(req, req.params.id);
+  if (!access.found) return fail(res, 404, 'Plan not found.');
+  if (!access.allowed) return fail(res, 403, 'Customers can only access their own installment plans.');
+
+  const deleted = await withTransaction(async (client) => {
+    const planResult = await client.query('SELECT id, customer_id FROM installment_plans WHERE id = $1', [req.params.id]);
+    if (!planResult.rowCount) throw Object.assign(new Error('Plan not found.'), { status: 404 });
+
+    const plan = planResult.rows[0];
+    const paymentCheck = await client.query(
+      `SELECT count(*)::int AS payment_count,
+              COALESCE(sum(amount), 0)::numeric AS collected_amount
+       FROM payments
+       WHERE plan_id = $1`,
+      [req.params.id]
+    );
+    const paymentCount = Number(paymentCheck.rows[0].payment_count || 0);
+    const collectedAmount = Number(paymentCheck.rows[0].collected_amount || 0);
+
+    if (paymentCount > 0 || collectedAmount > 0) {
+      throw Object.assign(new Error('This plan has recorded payment history and cannot be deleted. Please contact support or handle it manually.'), { status: 409 });
+    }
+
+    await client.query('DELETE FROM roznamcha_entries WHERE reference_plan_id = $1 OR reference_payment_id IN (SELECT id FROM payments WHERE plan_id = $1)', [req.params.id]);
+    await client.query('DELETE FROM installment_schedules WHERE plan_id = $1', [req.params.id]);
+    await client.query('DELETE FROM installment_plans WHERE id = $1', [req.params.id]);
+
+    await client.query(
+      `UPDATE customers
+       SET total_outstanding = (
+         SELECT COALESCE(sum(outstanding_balance), 0) FROM installment_plans WHERE customer_id = $1
+       ), updated_at = now()
+       WHERE id = $1`,
+      [plan.customer_id]
+    );
+
+    await writeAudit(client, req.user.id, 'DELETE', 'InstallmentPlan', req.params.id, `Deleted plan for customer ${plan.customer_id}`);
+    return { deletedPlanId: req.params.id, customerId: plan.customer_id };
+  }).catch((error) => {
+    if (error.status) return error;
+    const translated = translateSqlError(error);
+    if (translated) return translated;
+    throw error;
+  });
+
+  if (deleted instanceof Error) return fail(res, deleted.status, deleted.message);
+  return ok(res, deleted);
+}));
+
 router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
   const required = ['customerId', 'principalAmount', 'purchaseCost', 'downPayment', 'installmentAmount', 'frequency', 'startDate'];
   const missing = required.filter((field) => req.body?.[field] === undefined || req.body?.[field] === '');

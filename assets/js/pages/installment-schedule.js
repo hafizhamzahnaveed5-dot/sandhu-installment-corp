@@ -43,6 +43,9 @@ export default async function init({ param }) {
     : schedule.filter(s => s.status !== 'paid' && s.status !== 'settled')
         .reduce((sum, s) => sum + Math.max(0, s.amountDue - s.amountPaid), 0);
 
+  const hasPaymentHistory = paidAmount > 0;
+  const canDeletePlan = AuthService.hasMinRole('manager') && !hasPaymentHistory;
+
   // Can the current user initiate a settlement? (manager+)
   const canSettle = AuthService.hasMinRole('manager') && (plan.status === 'active' || plan.status === 'overdue') && remainingDisplay > 0;
 
@@ -120,24 +123,45 @@ export default async function init({ param }) {
         </div>
       </div>
 
-      <!-- Settle Early CTA — only for active plans & manager+ -->
-      ${canSettle ? `
-        <div style="
-          margin-top:var(--space-5);
-          padding-top:var(--space-5);
-          border-top:1px solid var(--color-border);
-          display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
-          <div>
-            <div style="font-weight:600;font-size:14px">Early Settlement Available</div>
-            <div style="font-size:13px;color:var(--color-text-secondary)">
-              Clear the entire remaining balance in one action — the system calculates the exact amount automatically.
-            </div>
+      <div style="
+        margin-top:var(--space-5);
+        padding-top:var(--space-5);
+        border-top:1px solid var(--color-border);
+        display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-weight:600;font-size:14px">Plan Actions</div>
+          <div style="font-size:13px;color:var(--color-text-secondary)">
+            Manage this plan or remove it when no payment history exists.
           </div>
-          <button id="btn-settle-early" class="btn btn-warning" style="
-            background:linear-gradient(135deg,#f59e0b,#d97706);
-            color:#000;font-weight:700;white-space:nowrap">
-            ✦ Settle Remaining Balance
-          </button>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          ${canDeletePlan ? `
+            <button id="btn-delete-plan" class="btn btn-danger btn-sm" style="white-space:nowrap">🗑 Delete Plan</button>
+          ` : `
+            <button class="btn btn-danger btn-sm" style="white-space:nowrap" disabled title="Delete is blocked because this plan already has payment history.">
+              🗑 Delete Plan
+            </button>
+          `}
+          ${canSettle ? `
+            <button id="btn-settle-early" class="btn btn-warning" style="
+              background:linear-gradient(135deg,#f59e0b,#d97706);
+              color:#000;font-weight:700;white-space:nowrap">
+              ✦ Settle Remaining Balance
+            </button>
+          ` : ''}
+        </div>
+      </div>
+
+      ${hasPaymentHistory ? `
+        <div style="
+          margin-top:var(--space-4);
+          padding:12px 14px;
+          border-radius:var(--radius-md);
+          background:rgba(239,68,68,.08);
+          border:1px solid rgba(239,68,68,.22);
+          color:var(--color-accent-red);
+          font-size:13px">
+          <strong>Delete blocked.</strong> This plan already has payment history, so it cannot be deleted. Please contact support or handle it manually.
         </div>
       ` : ''}
     </div>
@@ -216,6 +240,14 @@ export default async function init({ param }) {
     );
   }
 
+  // ── Bind: Delete Plan button ──
+  const deleteBtn = document.getElementById('btn-delete-plan');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', () => showDeletePlanModal(plan, () => {
+      window.location.hash = '#/installments';
+    }));
+  }
+
   // ── Bind: Record Payment buttons ──
   document.querySelectorAll('.record-payment-btn').forEach(btn => {
     btn.addEventListener('click', e => {
@@ -243,6 +275,64 @@ export default async function init({ param }) {
   if (settleBtn) {
     settleBtn.addEventListener('click', () => showSettlementModal(plan, () => init({ param: planId })));
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Delete Plan Modal
+// ─────────────────────────────────────────────────────────────────────────────
+function showDeletePlanModal(plan, onSuccess) {
+  const modal = Modal.create({
+    title: 'Delete Installment Plan',
+    content: `
+      <div style="display:grid;gap:12px">
+        <p style="margin:0;color:var(--color-text-secondary)">
+          This will permanently delete this one installment plan and all of its installment schedule/history for the customer below.
+        </p>
+        <div style="padding:12px 14px;border:1px solid var(--color-border);border-radius:var(--radius-md);background:rgba(239,68,68,.04)">
+          <div><strong>Customer:</strong> ${plan.customerName}</div>
+          <div><strong>Plan ID:</strong> ${plan.id}</div>
+        </div>
+        <div style="font-size:13px;color:var(--color-accent-red)">
+          This will also remove any linked Roznamcha purchase/payment entries for this plan, but it will not delete the customer record or any other plans for this customer. This cannot be undone.
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="delete-plan-confirmation">Type <strong>Yes, delete this plan</strong> to confirm</label>
+          <input id="delete-plan-confirmation" class="form-control" type="text" placeholder="Yes, delete this plan" />
+        </div>
+      </div>
+    `,
+    footer: `
+      <button class="btn btn-secondary" id="delete-plan-cancel">Cancel</button>
+      <button class="btn btn-danger" id="delete-plan-confirm" disabled>Yes, delete this plan</button>
+    `,
+  });
+
+  const input = modal.backdrop.querySelector('#delete-plan-confirmation');
+  const confirmBtn = modal.backdrop.querySelector('#delete-plan-confirm');
+  const cancelBtn = modal.backdrop.querySelector('#delete-plan-cancel');
+
+  const updateState = () => {
+    confirmBtn.disabled = input.value.trim() !== 'Yes, delete this plan';
+  };
+
+  input.addEventListener('input', updateState);
+  cancelBtn.addEventListener('click', () => modal.destroy());
+  confirmBtn.addEventListener('click', async () => {
+    if (input.value.trim() !== 'Yes, delete this plan') return;
+
+    const res = await InstallmentsService.deletePlan(plan.id);
+    if (!res.success) {
+      Toast.error('Delete failed', res.error || 'Unable to delete this plan.');
+      modal.destroy();
+      return;
+    }
+
+    modal.destroy();
+    Toast.success('Plan deleted', 'Plan deleted successfully.');
+    onSuccess?.();
+  });
+
+  modal.open();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
