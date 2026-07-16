@@ -66,6 +66,7 @@ function renderShell() {
         <div class="stat-card"><div class="stat-value" id="roz-purchase-total">Loading...</div><div class="stat-label">Purchases</div></div>
         <div class="stat-card"><div class="stat-value" id="roz-expense-total">Loading...</div><div class="stat-label">Expenses</div></div>
         <div class="stat-card"><div class="stat-value" id="roz-payment-total">Loading...</div><div class="stat-label">Payments Received</div></div>
+        <div class="stat-card"><div class="stat-value" id="roz-outstanding-total">Loading...</div><div class="stat-label">Outstanding Balance</div></div>
         <div class="stat-card"><div class="stat-value" id="roz-net-total">Loading...</div><div class="stat-label">Net Cash Flow</div></div>
       </div>
       <div id="roz-summary-note" class="secondary" style="margin-top:8px"></div>
@@ -254,11 +255,16 @@ async function loadRoznamcha() {
 
 function renderSummary(summary, from, to) {
   const period = summary?.period || {};
-  const note = buildSummaryNote(from, to);
+  const note = buildSummaryNote(from, to, period);
 
   document.getElementById('roz-purchase-total').textContent = formatCurrency(period.purchaseTotal || 0, true);
   document.getElementById('roz-expense-total').textContent = formatCurrency(period.expenseTotal || 0, true);
   document.getElementById('roz-payment-total').textContent = formatCurrency(period.paymentTotal || 0, true);
+
+  const outstandingEl = document.getElementById('roz-outstanding-total');
+  if (outstandingEl) {
+    outstandingEl.textContent = formatCurrency(period.outstandingTotal || 0, true);
+  }
 
   const netValue = Number(period.net || 0);
   const netEl = document.getElementById('roz-net-total');
@@ -272,13 +278,24 @@ function renderSummary(summary, from, to) {
   document.getElementById('roz-summary-note').textContent = note;
 }
 
-function buildSummaryNote(from, to) {
+function buildSummaryNote(from, to, period = {}) {
+  const inst = Number(period.installmentPayments || 0);
+  const down = Number(period.downPayments || 0);
+  const parts = [];
   if (from || to) {
-    if (from && to) return `Showing ${formatDate(from)} to ${formatDate(to)}`;
-    if (from) return `Showing ${formatDate(from)} to present`;
-    return `Showing up to ${formatDate(to)}`;
+    if (from && to) parts.push(`Showing ${formatDate(from)} to ${formatDate(to)}`);
+    else if (from) parts.push(`Showing ${formatDate(from)} to present`);
+    else parts.push(`Showing up to ${formatDate(to)}`);
+  } else {
+    parts.push('Showing all-time totals');
   }
-  return 'Showing all-time totals';
+  parts.push(
+    `Payments = installments ${formatCurrency(inst, true)} + down payments ${formatCurrency(down, true)}`
+  );
+  if (period.netPosition != null) {
+    parts.push(`Position (cash + outstanding − outflows): ${formatCurrency(period.netPosition, true)}`);
+  }
+  return parts.join(' · ');
 }
 
 function renderEntries(entries) {

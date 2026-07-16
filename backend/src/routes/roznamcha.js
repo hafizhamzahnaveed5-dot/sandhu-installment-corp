@@ -89,62 +89,145 @@ router.get('/summary', asyncHandler(async (req, res) => {
   const to = parseDate(req.query.to);
   const dateFilter = from || to;
 
-  const summaryResult = await pool.query(
-    `SELECT
-       COALESCE(SUM(CASE WHEN type = 'purchase' THEN amount ELSE 0 END), 0)::numeric AS purchase_total,
-       COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0)::numeric AS expense_total,
-       COALESCE(SUM(CASE WHEN type = 'payment_received' THEN amount ELSE 0 END), 0)::numeric AS payment_total,
-       COALESCE(SUM(amount), 0)::numeric AS combined_total
+  // Purchases = actual plan purchase costs (source of truth), not inflated orphan ledger rows
+  const purchaseResult = await pool.query(
+    `SELECT COALESCE(SUM(purchase_cost), 0)::numeric AS purchase_total
+     FROM installment_plans
+     WHERE ($1::date IS NULL OR start_date >= $1)
+       AND ($2::date IS NULL OR start_date <= $2)`,
+    [from, to]
+  );
+
+  // Manual expenses from Roznamcha only
+  const expenseResult = await pool.query(
+    `SELECT COALESCE(SUM(amount), 0)::numeric AS expense_total
      FROM roznamcha_entries
-     WHERE ($1::date IS NULL OR entry_date >= $1)
+     WHERE type = 'expense'
+       AND ($1::date IS NULL OR entry_date >= $1)
        AND ($2::date IS NULL OR entry_date <= $2)`,
     [from, to]
   );
-  const todayResult = await pool.query(
-    `SELECT
-       COALESCE(SUM(CASE WHEN type = 'purchase' THEN amount ELSE 0 END), 0)::numeric AS purchase_total,
-       COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0)::numeric AS expense_total,
-       COALESCE(SUM(CASE WHEN type = 'payment_received' THEN amount ELSE 0 END), 0)::numeric AS payment_total,
-       COALESCE(SUM(amount), 0)::numeric AS combined_total
-     FROM roznamcha_entries
-     WHERE entry_date = $1`,
+
+  // Payments received = all posted installment/settlement payments
+  const paymentResult = await pool.query(
+    `SELECT COALESCE(SUM(amount), 0)::numeric AS installment_payments
+     FROM payments
+     WHERE COALESCE(status, 'posted') <> 'reversed'
+       AND ($1::date IS NULL OR (paid_at AT TIME ZONE 'Asia/Karachi')::date >= $1)
+       AND ($2::date IS NULL OR (paid_at AT TIME ZONE 'Asia/Karachi')::date <= $2)`,
+    [from, to]
+  );
+
+  // Down payments collected when plans start (cash in, often not in payments table)
+  const downResult = await pool.query(
+    `SELECT COALESCE(SUM(down_payment), 0)::numeric AS down_payments
+     FROM installment_plans
+     WHERE ($1::date IS NULL OR start_date >= $1)
+       AND ($2::date IS NULL OR start_date <= $2)`,
+    [from, to]
+  );
+
+  // Outstanding is always a live snapshot of money still owed
+  const outstandingResult = await pool.query(
+    `SELECT COALESCE(SUM(outstanding_balance), 0)::numeric AS outstanding_total
+     FROM installment_plans
+     WHERE status NOT IN ('cancelled')`
+  );
+
+  const todayPurchase = await pool.query(
+    `SELECT COALESCE(SUM(purchase_cost), 0)::numeric AS v
+     FROM installment_plans WHERE start_date = $1`,
     [today]
   );
-  const monthlyResult = await pool.query(
-    `SELECT
-       COALESCE(SUM(CASE WHEN type = 'purchase' THEN amount ELSE 0 END), 0)::numeric AS monthly_purchase_total,
-       COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0)::numeric AS monthly_expense_total,
-       COALESCE(SUM(CASE WHEN type = 'payment_received' THEN amount ELSE 0 END), 0)::numeric AS monthly_payment_total,
-       COALESCE(SUM(amount), 0)::numeric AS monthly_combined_total
-     FROM roznamcha_entries
-     WHERE entry_date >= $1`,
+  const todayExpense = await pool.query(
+    `SELECT COALESCE(SUM(amount), 0)::numeric AS v
+     FROM roznamcha_entries WHERE type = 'expense' AND entry_date = $1`,
+    [today]
+  );
+  const todayPayments = await pool.query(
+    `SELECT COALESCE(SUM(amount), 0)::numeric AS v
+     FROM payments
+     WHERE COALESCE(status, 'posted') <> 'reversed'
+       AND (paid_at AT TIME ZONE 'Asia/Karachi')::date = $1`,
+    [today]
+  );
+  const todayDown = await pool.query(
+    `SELECT COALESCE(SUM(down_payment), 0)::numeric AS v
+     FROM installment_plans WHERE start_date = $1`,
+    [today]
+  );
+
+  const monthPurchase = await pool.query(
+    `SELECT COALESCE(SUM(purchase_cost), 0)::numeric AS v
+     FROM installment_plans WHERE start_date >= $1`,
     [monthStart]
   );
-  const row = summaryResult.rows[0];
-  const todayRow = todayResult.rows[0];
-  const monthlyRow = monthlyResult.rows[0];
+  const monthExpense = await pool.query(
+    `SELECT COALESCE(SUM(amount), 0)::numeric AS v
+     FROM roznamcha_entries WHERE type = 'expense' AND entry_date >= $1`,
+    [monthStart]
+  );
+  const monthPayments = await pool.query(
+    `SELECT COALESCE(SUM(amount), 0)::numeric AS v
+     FROM payments
+     WHERE COALESCE(status, 'posted') <> 'reversed'
+       AND (paid_at AT TIME ZONE 'Asia/Karachi')::date >= $1`,
+    [monthStart]
+  );
+  const monthDown = await pool.query(
+    `SELECT COALESCE(SUM(down_payment), 0)::numeric AS v
+     FROM installment_plans WHERE start_date >= $1`,
+    [monthStart]
+  );
+
+  const purchaseTotal = Number(purchaseResult.rows[0].purchase_total || 0);
+  const expenseTotal = Number(expenseResult.rows[0].expense_total || 0);
+  const installmentPayments = Number(paymentResult.rows[0].installment_payments || 0);
+  const downPayments = Number(downResult.rows[0].down_payments || 0);
+  const paymentTotal = installmentPayments + downPayments;
+  const outstandingTotal = Number(outstandingResult.rows[0].outstanding_total || 0);
+  // Cash flow: money in − money out
+  const netCash = paymentTotal - purchaseTotal - expenseTotal;
+  // Business position: cash collected + still owed − purchases/expenses
+  const netPosition = paymentTotal + outstandingTotal - purchaseTotal - expenseTotal;
+
+  const tPurchase = Number(todayPurchase.rows[0].v || 0);
+  const tExpense = Number(todayExpense.rows[0].v || 0);
+  const tPayment = Number(todayPayments.rows[0].v || 0) + Number(todayDown.rows[0].v || 0);
+  const mPurchase = Number(monthPurchase.rows[0].v || 0);
+  const mExpense = Number(monthExpense.rows[0].v || 0);
+  const mPayment = Number(monthPayments.rows[0].v || 0) + Number(monthDown.rows[0].v || 0);
+
   return ok(res, {
     period: {
-      purchaseTotal: Number(row.purchase_total || 0),
-      expenseTotal: Number(row.expense_total || 0),
-      paymentTotal: Number(row.payment_total || 0),
-      combinedTotal: Number(row.combined_total || 0),
-      net: Number((row.payment_total || 0) - ((row.purchase_total || 0) + (row.expense_total || 0))),
+      purchaseTotal,
+      expenseTotal,
+      paymentTotal,
+      installmentPayments,
+      downPayments,
+      outstandingTotal,
+      combinedTotal: purchaseTotal + expenseTotal + paymentTotal,
+      net: netCash,
+      netPosition,
       label: dateFilter ? `${from || 'Start'} → ${to || 'Today'}` : 'Selected period',
     },
     today: {
-      purchaseTotal: Number(todayRow.purchase_total || 0),
-      expenseTotal: Number(todayRow.expense_total || 0),
-      paymentTotal: Number(todayRow.payment_total || 0),
-      combinedTotal: Number(todayRow.combined_total || 0),
-      net: Number((todayRow.payment_total || 0) - ((todayRow.purchase_total || 0) + (todayRow.expense_total || 0))),
+      purchaseTotal: tPurchase,
+      expenseTotal: tExpense,
+      paymentTotal: tPayment,
+      outstandingTotal,
+      combinedTotal: tPurchase + tExpense + tPayment,
+      net: tPayment - tPurchase - tExpense,
+      netPosition: tPayment + outstandingTotal - tPurchase - tExpense,
     },
     thisMonth: {
-      purchaseTotal: Number(monthlyRow.monthly_purchase_total || 0),
-      expenseTotal: Number(monthlyRow.monthly_expense_total || 0),
-      paymentTotal: Number(monthlyRow.monthly_payment_total || 0),
-      combinedTotal: Number(monthlyRow.monthly_combined_total || 0),
-      net: Number((monthlyRow.monthly_payment_total || 0) - ((monthlyRow.monthly_purchase_total || 0) + (monthlyRow.monthly_expense_total || 0))),
+      purchaseTotal: mPurchase,
+      expenseTotal: mExpense,
+      paymentTotal: mPayment,
+      outstandingTotal,
+      combinedTotal: mPurchase + mExpense + mPayment,
+      net: mPayment - mPurchase - mExpense,
+      netPosition: mPayment + outstandingTotal - mPurchase - mExpense,
     },
   });
 }));

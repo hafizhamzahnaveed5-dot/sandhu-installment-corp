@@ -71,16 +71,24 @@ export const Config = {
  */
 export function formatCurrency(amount, compact = false) {
   if (amount === null || amount === undefined) return '—';
+  const n = Number(amount);
+  if (!Number.isFinite(n)) return '—';
   if (compact) {
-    if (amount >= 1_000_000) return `PKR ${(amount / 1_000_000).toFixed(1)}M`;
-    if (amount >= 1_000)     return `PKR ${(amount / 1_000).toFixed(0)}K`;
+    const abs = Math.abs(n);
+    const sign = n < 0 ? '-' : '';
+    if (abs >= 1_000_000) return `${sign}PKR ${(abs / 1_000_000).toFixed(1)}M`;
+    if (abs >= 1_000) return `${sign}PKR ${(abs / 1_000).toFixed(0)}K`;
+    return `${sign}PKR ${Math.round(abs).toLocaleString('en-PK')}`;
   }
-  return new Intl.NumberFormat(Config.BUSINESS.CURRENCY_LOCALE, {
+  const formatted = new Intl.NumberFormat('en-PK', {
     style: 'currency',
-    currency: Config.BUSINESS.CURRENCY,
+    currency: 'PKR',
+    currencyDisplay: 'code',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(n);
+  // en-PK sometimes yields "PKR 1,000" — keep consistent
+  return formatted.replace(/^PKR\s?/, 'PKR ');
 }
 
 /** Format a date as dd-mm-yyyy (avoids UTC day-shift for YYYY-MM-DD). */
