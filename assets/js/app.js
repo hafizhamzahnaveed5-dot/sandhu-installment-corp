@@ -21,7 +21,7 @@ import { Config } from './config.js';
 
 // ── Theme Initialization ──────────────────────────────────────
 (function initTheme() {
-  const saved = localStorage.getItem('sic_theme') || 'dark';
+  const saved = localStorage.getItem('sic_theme') || 'light';
   document.documentElement.dataset.theme = saved;
 })();
 

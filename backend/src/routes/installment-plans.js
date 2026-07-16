@@ -6,13 +6,16 @@ import { mapPayment, mapPlan, mapSchedule } from '../services/mappers.js';
 import { calculateSettlementBreakdown, performEarlySettlement } from '../services/settlement.js';
 import { asyncHandler, fail, ok, pagination, paginationParams } from '../utils/respond.js';
 import { newId } from '../utils/ids.js';
+import { todayDateOnly, toDateOnly } from '../utils/dates.js';
 
 const router = express.Router();
 
 router.use(authenticate);
 
 function addPeriod(startDate, frequency, index) {
-  const date = new Date(`${startDate}T00:00:00Z`);
+  const base = toDateOnly(startDate);
+  if (!base) throw Object.assign(new Error('Invalid start date.'), { status: 400 });
+  const date = new Date(`${base}T00:00:00.000Z`);
   if (frequency === 'daily') date.setUTCDate(date.getUTCDate() + index);
   else if (frequency === 'weekly') date.setUTCDate(date.getUTCDate() + index * 7);
   else date.setUTCMonth(date.getUTCMonth() + index);
@@ -277,11 +280,14 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
       hasFileFeeColumn ? insertParamsWithFileFee : insertParamsWithoutFileFee
     );
 
-    const today = new Date().toISOString().slice(0, 10);
-    const dueSoonCutoff = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const today = todayDateOnly();
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() + 2);
+    const dueSoonCutoff = toDateOnly(cutoff);
+    const planStartDate = toDateOnly(req.body.startDate) || today;
 
     for (let i = 0; i < scheduleRows.length; i += 1) {
-      const dueDate = addPeriod(req.body.startDate, req.body.frequency, i);
+      const dueDate = addPeriod(planStartDate, req.body.frequency, i);
       const initialStatus = dueDate < today
         ? 'overdue'
         : dueDate <= dueSoonCutoff
@@ -309,7 +315,7 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
       await client.query(
         `INSERT INTO roznamcha_entries (id, entry_date, type, description, amount, reference_plan_id, created_by)
          VALUES ($1, $2, 'purchase', $3, $4, $5, $6)`,
-        [newId('roz'), new Date().toISOString().slice(0, 10), `Purchase cost for plan ${id}`, purchaseCost, id, req.user.id]
+        [newId('roz'), planStartDate, `Purchase cost for plan ${id}`, purchaseCost, id, req.user.id]
       );
     } catch (error) {
       console.error('Roznamcha auto-entry failed for plan creation:', error);

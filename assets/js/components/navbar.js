@@ -4,6 +4,7 @@
  */
 
 import NotificationsService from '../services/notifications.service.js';
+import AuthService from '../services/auth.service.js';
 import { formatDate } from '../config.js';
 import { initGlobalSearch } from './search.js';
 
@@ -64,7 +65,13 @@ export function renderNavbar(pageTitle = '', pageSubtitle = '') {
   initGlobalSearch();
 
   // Notifications
-  loadNotifications();
+  loadNotifications().catch((error) => {
+    console.error('Navbar notification load failed:', error);
+    if (error.status === 401 || String(error.message).toLowerCase().includes('auth')) {
+      AuthService.logout();
+      window.location.hash = '/login';
+    }
+  });
   document.getElementById('notif-toggle')?.addEventListener('click', e => {
     e.stopPropagation();
     document.getElementById('notif-panel')?.classList.toggle('open');
@@ -84,7 +91,19 @@ export function renderNavbar(pageTitle = '', pageSubtitle = '') {
 }
 
 async function loadNotifications() {
-  const result = await NotificationsService.list();
+  let result;
+  try {
+    result = await NotificationsService.list();
+  } catch (error) {
+    console.error('Notification load failed:', error);
+    if (error.status === 401 || error.message?.toLowerCase().includes('auth')) {
+      AuthService.logout();
+      window.location.hash = '/login';
+      return;
+    }
+    return;
+  }
+
   const notifs = result.data || [];
   const unread = notifs.filter(n => !n.isRead);
 

@@ -1,6 +1,6 @@
 import express from 'express';
 import { pool, withTransaction } from '../db.js';
-import { authenticate, customerOwns, requireMinRole } from '../middleware/auth.js';
+import { authenticate, customerOwns, requireMinRole, requireRole } from '../middleware/auth.js';
 import { writeAudit } from '../services/audit.js';
 import { mapCustomer } from '../services/mappers.js';
 import { asyncHandler, fail, ok, pagination, paginationParams } from '../utils/respond.js';
@@ -15,28 +15,59 @@ router.get('/', asyncHandler(async (req, res) => {
   const { page, pageSize, offset } = paginationParams(req);
   const values = [];
   const where = [];
+  const viewCosts = req.query.view === 'costs';
 
   if (req.user.role === 'customer') {
     values.push(req.user.customerId);
-    where.push(`id = $${values.length}`);
+    where.push(`c.id = $${values.length}`);
   }
   if (req.query.search) {
     values.push(`%${req.query.search}%`);
-    where.push(`(full_name ILIKE $${values.length} OR phone ILIKE $${values.length} OR city ILIKE $${values.length} OR account_number ILIKE $${values.length})`);
+    where.push(`(c.full_name ILIKE $${values.length} OR c.phone ILIKE $${values.length} OR c.city ILIKE $${values.length} OR c.account_number ILIKE $${values.length})`);
   }
   if (req.query.status) {
     values.push(req.query.status);
-    where.push(`status = $${values.length}`);
+    where.push(`c.status = $${values.length}`);
   }
 
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-  const count = await pool.query(`SELECT count(*)::int AS total FROM customers ${whereSql}`, values);
+  const count = await pool.query(`SELECT count(*)::int AS total FROM customers c ${whereSql}`, values);
+
   const rows = await pool.query(
-    `SELECT * FROM customers ${whereSql} ORDER BY created_at DESC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
+    viewCosts
+      ? `SELECT c.*, COALESCE(tc.total_purchase_cost, 0)::numeric AS total_purchase_cost, COALESCE(tc.total_cost_gap, 0)::numeric AS total_cost_gap
+         FROM customers c
+         LEFT JOIN (
+           SELECT customer_id, SUM(purchase_cost)::numeric AS total_purchase_cost,
+                  SUM(principal_amount - purchase_cost)::numeric AS total_cost_gap
+           FROM installment_plans
+           GROUP BY customer_id
+         ) tc ON tc.customer_id = c.id
+         ${whereSql}
+         ORDER BY c.created_at DESC
+         LIMIT $${values.length + 1} OFFSET $${values.length + 2}`
+      : `SELECT c.* FROM customers c ${whereSql} ORDER BY c.created_at DESC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
     [...values, pageSize, offset]
   );
 
   return ok(res, rows.rows.map(mapCustomer), pagination(page, pageSize, count.rows[0].total));
+}));
+
+/** Admin-only: list customers with zero outstanding (candidates for cleanup). */
+router.get('/admin/zero-outstanding', requireRole('admin'), asyncHandler(async (_req, res) => {
+  const result = await pool.query(`
+    SELECT c.*,
+           (SELECT count(*)::int FROM installment_plans WHERE customer_id = c.id) AS plan_count,
+           (SELECT count(*)::int FROM payments WHERE customer_id = c.id) AS payment_count
+    FROM customers c
+    WHERE COALESCE(c.total_outstanding, 0) = 0
+    ORDER BY c.full_name ASC
+  `);
+  return ok(res, result.rows.map((row) => ({
+    ...mapCustomer(row),
+    planCount: row.plan_count,
+    paymentCount: row.payment_count,
+  })));
 }));
 
 router.get('/:id', asyncHandler(async (req, res) => {
@@ -122,6 +153,55 @@ router.put('/:id', requireMinRole('manager'), asyncHandler(async (req, res) => {
 }));
 
 router.delete('/:id', requireMinRole('manager'), asyncHandler(async (req, res) => {
+  const existing = await pool.query('SELECT * FROM customers WHERE id = $1', [req.params.id]);
+  if (!existing.rowCount) return fail(res, 404, 'Customer not found.');
+
+  const outstanding = Number(existing.rows[0].total_outstanding || 0);
+  const forceZero = req.query.forceZero === 'true' || req.body?.forceZero === true;
+
+  // Admin may purge fully settled customers (outstanding = 0) including history.
+  if (forceZero) {
+    if (req.user.role !== 'admin') {
+      return fail(res, 403, 'Only admins can delete settled customers with history.');
+    }
+    if (outstanding > 0) {
+      return fail(res, 409, 'Customer still has outstanding balance and cannot be deleted.');
+    }
+
+    const row = await withTransaction(async (client) => {
+      const locked = await client.query(
+        `SELECT * FROM customers WHERE id = $1 AND COALESCE(total_outstanding, 0) = 0 FOR UPDATE`,
+        [req.params.id]
+      );
+      if (!locked.rowCount) {
+        throw Object.assign(new Error('Customer outstanding changed; delete aborted.'), { status: 409 });
+      }
+
+      const plans = await client.query('SELECT id FROM installment_plans WHERE customer_id = $1', [req.params.id]);
+      const planIds = plans.rows.map((r) => r.id);
+      const payments = await client.query('SELECT id FROM payments WHERE customer_id = $1', [req.params.id]);
+      const paymentIds = payments.rows.map((r) => r.id);
+
+      if (paymentIds.length) {
+        await client.query('DELETE FROM roznamcha_entries WHERE reference_payment_id = ANY($1)', [paymentIds]);
+      }
+      if (planIds.length) {
+        await client.query('DELETE FROM roznamcha_entries WHERE reference_plan_id = ANY($1)', [planIds]);
+        await client.query('DELETE FROM installment_schedules WHERE plan_id = ANY($1)', [planIds]);
+      }
+      await client.query('DELETE FROM payments WHERE customer_id = $1', [req.params.id]);
+      await client.query('DELETE FROM installment_plans WHERE customer_id = $1', [req.params.id]);
+      await client.query('DELETE FROM sms_notifications_log WHERE customer_id = $1', [req.params.id]);
+      await client.query('UPDATE users SET customer_id = NULL WHERE customer_id = $1', [req.params.id]);
+
+      const deleted = await client.query('DELETE FROM customers WHERE id = $1 RETURNING *', [req.params.id]);
+      await writeAudit(client, req.user.id, 'DELETE', 'Customer', req.params.id, `Deleted settled customer (0 outstanding): ${deleted.rows[0].full_name}`);
+      return deleted.rows[0];
+    });
+
+    return ok(res, mapCustomer(row));
+  }
+
   const active = await pool.query(
     'SELECT id FROM installment_plans WHERE customer_id = $1 AND status = ANY($2::text[]) LIMIT 1',
     [req.params.id, activePlanStatuses]

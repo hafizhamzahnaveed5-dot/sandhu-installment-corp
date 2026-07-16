@@ -1,8 +1,9 @@
 import express from 'express';
 import { pool } from '../db.js';
-import { authenticate, requireMinRole } from '../middleware/auth.js';
+import { authenticate, requireMinRole, requireRole } from '../middleware/auth.js';
 import { asyncHandler, fail, ok } from '../utils/respond.js';
 import { newId } from '../utils/ids.js';
+import { pgDateOnly, todayDateOnly, toDateOnly } from '../utils/dates.js';
 
 const router = express.Router();
 
@@ -15,10 +16,7 @@ function normalizeType(value) {
 }
 
 function parseDate(value) {
-  if (!value) return null;
-  const date = new Date(`${value}T00:00:00Z`);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString().slice(0, 10);
+  return toDateOnly(value);
 }
 
 router.get('/', asyncHandler(async (req, res) => {
@@ -55,7 +53,7 @@ router.get('/', asyncHandler(async (req, res) => {
 
   return ok(res, result.rows.map((row) => ({
     id: row.id,
-    entryDate: row.entry_date,
+    entryDate: pgDateOnly(row.entry_date),
     type: row.type,
     description: row.description,
     amount: Number(row.amount),
@@ -69,8 +67,9 @@ router.get('/', asyncHandler(async (req, res) => {
 }));
 
 router.get('/summary', asyncHandler(async (req, res) => {
-  const today = new Date().toISOString().slice(0, 10);
-  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+  const today = todayDateOnly();
+  const now = new Date();
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
   const from = parseDate(req.query.from);
   const to = parseDate(req.query.to);
   const dateFilter = from || to;
@@ -137,7 +136,7 @@ router.get('/summary', asyncHandler(async (req, res) => {
 
 router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
   const { date, description, amount, type } = req.body || {};
-  const entryDate = parseDate(date || new Date().toISOString().slice(0, 10));
+  const entryDate = parseDate(date || todayDateOnly());
   const normalizedType = normalizeType(type);
   const numericAmount = Number(amount || 0);
 
@@ -155,7 +154,7 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
 
   return ok(res, {
     id: result.rows[0].id,
-    entryDate: result.rows[0].entry_date,
+    entryDate: pgDateOnly(result.rows[0].entry_date),
     type: result.rows[0].type,
     description: result.rows[0].description,
     amount: Number(result.rows[0].amount),
@@ -170,7 +169,9 @@ router.put('/:id', requireMinRole('manager'), asyncHandler(async (req, res) => {
   const entryResult = await pool.query('SELECT * FROM roznamcha_entries WHERE id = $1', [req.params.id]);
   if (!entryResult.rowCount) return fail(res, 404, 'Entry not found.');
   const entry = entryResult.rows[0];
-  if (entry.reference_plan_id) return fail(res, 400, 'Plan-linked purchase entries are read-only.');
+  if (entry.reference_plan_id || entry.reference_payment_id) {
+    return fail(res, 400, 'Linked ledger entries are read-only. Edit the source payment or plan instead.');
+  }
 
   const { date, description, amount } = req.body || {};
   const entryDate = parseDate(date || entry.entry_date);
@@ -189,7 +190,7 @@ router.put('/:id', requireMinRole('manager'), asyncHandler(async (req, res) => {
 
   return ok(res, {
     id: updated.rows[0].id,
-    entryDate: updated.rows[0].entry_date,
+    entryDate: pgDateOnly(updated.rows[0].entry_date),
     type: updated.rows[0].type,
     description: updated.rows[0].description,
     amount: Number(updated.rows[0].amount),
@@ -200,11 +201,13 @@ router.put('/:id', requireMinRole('manager'), asyncHandler(async (req, res) => {
   });
 }));
 
-router.delete('/:id', requireMinRole('manager'), asyncHandler(async (req, res) => {
+router.delete('/:id', requireRole('admin'), asyncHandler(async (req, res) => {
   const entryResult = await pool.query('SELECT * FROM roznamcha_entries WHERE id = $1', [req.params.id]);
   if (!entryResult.rowCount) return fail(res, 404, 'Entry not found.');
   const entry = entryResult.rows[0];
-  if (entry.reference_plan_id) return fail(res, 400, 'Plan-linked purchase entries cannot be deleted directly.');
+  if (entry.reference_plan_id || entry.reference_payment_id) {
+    return fail(res, 400, 'Linked ledger entries cannot be deleted directly.');
+  }
 
   await pool.query('DELETE FROM roznamcha_entries WHERE id = $1', [req.params.id]);
   return ok(res, { deleted: true, id: req.params.id });

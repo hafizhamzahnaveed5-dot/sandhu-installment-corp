@@ -14,6 +14,7 @@
 import { Config } from '../config.js';
 import { api } from './api.js';
 import { MOCK_CUSTOMERS } from '../mock/customers.mock.js';
+import { MOCK_INSTALLMENT_PLANS } from '../mock/installments.mock.js';
 import AuditService from './audit.service.js';
 import EventBus from '../components/event-bus.js';
 import InstallmentsService from './installments.service.js';
@@ -22,13 +23,14 @@ const delay = (ms = 350) => new Promise(r => setTimeout(r, ms));
 
 // In-memory store for mock creates/updates
 let mockStore = [...MOCK_CUSTOMERS];
+let mockPlans = [...MOCK_INSTALLMENT_PLANS];
 
 const CustomersService = {
   /**
    * List customers with search, filter, and pagination.
    * @param {object} params — { search, status, page, pageSize }
    */
-  async list({ search = '', status = '', page = 1, pageSize = Config.DEFAULT_PAGE_SIZE } = {}) {
+  async list({ search = '', status = '', page = 1, pageSize = Config.DEFAULT_PAGE_SIZE, view = '' } = {}) {
     if (Config.FEATURE_FLAGS.MOCK_MODE) {
       await delay();
       let data = [...mockStore];
@@ -43,6 +45,20 @@ const CustomersService = {
       }
       if (status) data = data.filter(c => c.status === status);
 
+      if (view === 'costs') {
+        const totals = mockPlans.reduce((acc, plan) => {
+          if (!acc[plan.customerId]) acc[plan.customerId] = { totalPurchaseCost: 0, totalCostGap: 0 };
+          acc[plan.customerId].totalPurchaseCost += Number(plan.purchaseCost || 0);
+          acc[plan.customerId].totalCostGap += Number((plan.principalAmount || 0) - (plan.purchaseCost || 0));
+          return acc;
+        }, {});
+        data = data.map(c => ({
+          ...c,
+          totalPurchaseCost: totals[c.id]?.totalPurchaseCost || 0,
+          totalCostGap: totals[c.id]?.totalCostGap || 0,
+        }));
+      }
+
       const total = data.length;
       const start = (page - 1) * pageSize;
       const items = data.slice(start, start + pageSize);
@@ -53,7 +69,7 @@ const CustomersService = {
         pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
       };
     }
-    return api.get('/customers', { search, status, page, pageSize });
+    return api.get('/customers', { search, status, page, pageSize, view });
   },
 
   /**
@@ -108,8 +124,9 @@ const CustomersService = {
 
   /**
    * Delete a customer if they do not have open installment plans.
+   * Admins may purge fully settled customers (0 outstanding) with forceZero.
    */
-  async delete(id) {
+  async delete(id, { forceZero = false } = {}) {
     const plansResult = await InstallmentsService.listPlans({ customerId: id, pageSize: 9999 });
     if (!plansResult.success) {
       return { success: false, data: null, error: plansResult.error || 'Unable to verify customer installment plans.' };
@@ -117,7 +134,7 @@ const CustomersService = {
 
     const openStatuses = ['active', 'overdue', 'due-soon', 'pending', 'defaulted'];
     const openPlans = (plansResult.data || []).filter(plan => openStatuses.includes(plan.status));
-    if (openPlans.length > 0) {
+    if (openPlans.length > 0 && !forceZero) {
       return {
         success: false,
         data: null,
@@ -136,7 +153,8 @@ const CustomersService = {
     }
 
     try {
-      const result = await api.delete(`/customers/${id}`);
+      const path = forceZero ? `/customers/${id}?forceZero=true` : `/customers/${id}`;
+      const result = await api.delete(path);
       if (result.success) {
         await AuditService.log('DELETE', 'Customer', id, `Deleted customer ID: ${id}`);
         EventBus.emit('customer:deleted', { id });

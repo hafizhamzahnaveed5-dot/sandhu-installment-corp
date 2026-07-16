@@ -1,3 +1,5 @@
+import { pgDateOnly, todayDateOnly, toDateOnly } from '../utils/dates.js';
+
 export function mapCustomer(row) {
   if (!row) return null;
   return {
@@ -40,7 +42,7 @@ export function mapPlan(row) {
     numberOfInstallments: Number(row.number_of_installments),
     installmentAmount: Number(row.installment_amount),
     frequency: row.frequency,
-    startDate: row.start_date?.toISOString?.().slice(0, 10) || row.start_date,
+    startDate: pgDateOnly(row.start_date),
     status: row.status,
     interestOrMarkup: Number(row.interest_or_markup),
     discountAmount: Number(row.discount_amount || 0),
@@ -59,11 +61,13 @@ function computeScheduleStatus(row) {
   const rawStatus = String(row.status || '').trim();
   if (['paid', 'settled', 'partial'].includes(rawStatus)) return rawStatus;
 
-  const dueDate = row.due_date?.toISOString?.().slice(0, 10) || String(row.due_date || '');
+  const dueDate = pgDateOnly(row.due_date) || '';
   if (!dueDate) return rawStatus || 'pending';
 
-  const today = new Date().toISOString().slice(0, 10);
-  const dueSoonCutoff = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const today = todayDateOnly();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() + 2);
+  const dueSoonCutoff = toDateOnly(cutoff);
 
   if (dueDate < today) return 'overdue';
   if (dueDate <= dueSoonCutoff) return 'due-soon';
@@ -76,7 +80,7 @@ export function mapSchedule(row) {
     id: row.id,
     planId: row.plan_id,
     installmentNumber: Number(row.installment_number),
-    dueDate: row.due_date?.toISOString?.().slice(0, 10) || row.due_date,
+    dueDate: pgDateOnly(row.due_date),
     amountDue: Number(row.amount_due),
     amountPaid: Number(row.amount_paid),
     principalDue: Number(row.principal_due || 0),

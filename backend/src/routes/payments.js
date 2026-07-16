@@ -5,6 +5,7 @@ import { writeAudit } from '../services/audit.js';
 import { mapCustomer, mapPayment, mapPlan } from '../services/mappers.js';
 import { sendPaymentConfirmation } from '../services/sms.js';
 import { newId, receiptNumber } from '../utils/ids.js';
+import { parseBusinessDateTime, pgDateOnly, todayDateOnly, toDateOnly } from '../utils/dates.js';
 import { asyncHandler, fail, ok, pagination, paginationParams } from '../utils/respond.js';
 
 const router = express.Router();
@@ -70,8 +71,9 @@ router.post('/', requireMinRole('agent'), asyncHandler(async (req, res) => {
     const scheduleRow = schedule.rows[0];
     if (scheduleRow.status === 'settled') throw Object.assign(new Error('This schedule row was closed by early settlement.'), { status: 400 });
 
-    const paidAt = req.body.paidAt ? new Date(req.body.paidAt) : new Date();
-    const paidAtDate = paidAt.toISOString().slice(0, 10);
+    const paidAtInput = req.body.paidAt ? String(req.body.paidAt).trim() : '';
+    const paidAt = paidAtInput ? parseBusinessDateTime(paidAtInput) : new Date();
+    const paidAtDate = paidAtInput ? (toDateOnly(paidAtInput) || todayDateOnly()) : todayDateOnly();
 
     const schedules = await client.query(
       `SELECT *
@@ -84,12 +86,12 @@ router.post('/', requireMinRole('agent'), asyncHandler(async (req, res) => {
 
     const principalTotal = schedules.rows.reduce((sum, row) => sum + Number(row.principal_due || 0), 0);
     const markupEarnedThroughPaymentDate = schedules.rows
-      .filter((row) => String(row.due_date?.toISOString?.().slice(0, 10) || row.due_date) <= paidAtDate)
+      .filter((row) => (pgDateOnly(row.due_date) || '') <= paidAtDate)
       .reduce((sum, row) => sum + Number(row.markup_amount || 0), 0);
     const paidBefore = schedules.rows.reduce((sum, row) => sum + Number(row.amount_paid || 0), 0);
     const settlementRequired = principalTotal + markupEarnedThroughPaymentDate;
     const futureOpenRows = schedules.rows.filter((row) => {
-      const dueDate = String(row.due_date?.toISOString?.().slice(0, 10) || row.due_date);
+      const dueDate = pgDateOnly(row.due_date) || '';
       return dueDate > paidAtDate && row.status !== 'paid' && row.status !== 'settled';
     });
     const isEarlySettlement = futureOpenRows.length > 0 && paidBefore + Number(amount) >= settlementRequired;
@@ -102,7 +104,7 @@ router.post('/', requireMinRole('agent'), asyncHandler(async (req, res) => {
        RETURNING *`,
       [
         newId('pay'), planId, scheduleId, scheduleRow.customer_id, amount, method, req.user.id,
-        receiptNumber(sequence.rows[0].next_number), req.body.paidAt || null, req.body.notes || '',
+        receiptNumber(sequence.rows[0].next_number), paidAtDate, req.body.notes || '',
         isEarlySettlement, 0,
       ]
     );
@@ -111,11 +113,10 @@ router.post('/', requireMinRole('agent'), asyncHandler(async (req, res) => {
     try {
       const custRes = await client.query('SELECT full_name FROM customers WHERE id = $1', [scheduleRow.customer_id]);
       const customerName = custRes.rows[0]?.full_name || null;
-      const entryDate = (req.body.paidAt ? new Date(req.body.paidAt) : new Date()).toISOString().slice(0, 10);
       await client.query(
         `INSERT INTO roznamcha_entries (id, entry_date, type, description, amount, reference_plan_id, reference_payment_id, created_by)
          VALUES ($1, $2, 'payment_received', $3, $4, $5, $6, $7)`,
-        [newId('roz'), entryDate, `Installment payment received from ${customerName || 'customer'} - Plan ${planId}`, amount, planId, inserted.rows[0].id, req.user.id]
+        [newId('roz'), paidAtDate, `Installment payment received from ${customerName || 'customer'} - Plan ${planId}`, amount, planId, inserted.rows[0].id, req.user.id]
       );
     } catch (err) {
       console.error('Roznamcha auto-entry failed for payment:', err);
@@ -347,14 +348,21 @@ router.put('/:id/reverse', requireRole('admin'), asyncHandler(async (req, res) =
     } else {
       await client.query(
         `UPDATE installment_schedules
-         SET amount_paid = $2,
-             principal_paid = $3,
-             markup_earned = $4,
-             status = COALESCE($5, ${statusForUnpaidDueDateSql()}),
-             paid_date = CASE WHEN $2 <= 0 THEN NULL ELSE paid_date END,
+         SET amount_paid = $2::numeric,
+             principal_paid = $3::numeric,
+             markup_earned = $4::numeric,
              updated_at = now()
          WHERE id = $1`,
-        [row.schedule_id, nextPaid, principalPaid, markupEarned, nextStatus]
+        [row.schedule_id, nextPaid, principalPaid, markupEarned]
+      );
+
+      await client.query(
+        `UPDATE installment_schedules
+         SET status = COALESCE($2::text, ${statusForUnpaidDueDateSql()}),
+             paid_date = CASE WHEN $3::numeric <= 0::numeric THEN NULL ELSE paid_date END,
+             updated_at = now()
+         WHERE id = $1`,
+        [row.schedule_id, nextStatus, nextPaid]
       );
     }
 

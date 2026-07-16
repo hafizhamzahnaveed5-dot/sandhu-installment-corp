@@ -103,6 +103,13 @@ function renderShell(user) {
         </div>
 
         <div class="card">
+          <div class="card-header"><h4>Admin Controls</h4></div>
+          <div id="dash-admin-panel" style="display:flex;flex-direction:column;gap:var(--space-3)">
+            <div class="skeleton" style="height:90px;border-radius:var(--radius-sm)"></div>
+          </div>
+        </div>
+
+        <div class="card">
           <div class="card-header"><h4>System</h4></div>
           <div style="display:flex;flex-direction:column;gap:var(--space-3)">
             <div class="info-row">
@@ -132,9 +139,11 @@ function renderQuickActions() {
     { label: 'New Customer',   icon: '👤', route: 'customers' },
     { label: 'Create Plan',    icon: '📋', route: 'installments/create' },
     { label: 'View Payments',  icon: '💳', route: 'payments' },
+    { label: 'Roznamcha',      icon: '📒', route: 'roznamcha' },
     { label: 'View Reports',   icon: '📈', route: 'reports' },
     { label: 'Analytics',      icon: '📉', route: 'analytics' },
     { label: 'Manage Staff',   icon: '👥', route: 'users' },
+    { label: 'Audit Logs',     icon: '📝', route: 'audit-logs' },
   ];
 
   actions.forEach(a => {
@@ -178,6 +187,41 @@ async function refreshAll() {
   refreshKPIs(summaryRes);
   refreshChart(chartRes);
   refreshDueList(dueRes);
+  refreshAdminPanel(summaryRes);
+}
+
+function refreshAdminPanel(summaryRes) {
+  const el = document.getElementById('dash-admin-panel');
+  if (!el) return;
+  if (!summaryRes.success) {
+    el.innerHTML = `<div class="alert alert-danger">Could not load admin metrics.</div>`;
+    return;
+  }
+  const d = summaryRes.data;
+  const roz = d.roznamchaToday || {};
+  el.innerHTML = `
+    <div class="info-row">
+      <span class="info-label">Payments today</span>
+      <span class="info-value">${d.paymentsTodayCount || 0} · ${formatCurrency(d.paymentsTodayAmount || 0)}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Roznamcha net today</span>
+      <span class="info-value">${formatCurrency(roz.net || 0)}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Active staff users</span>
+      <span class="info-value">${d.activeUsers || '—'}</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Total outstanding</span>
+      <span class="info-value">${formatCurrency(d.totalOutstanding || 0)}</span>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+      <a href="#/users" class="btn btn-secondary btn-sm">Users</a>
+      <a href="#/audit-logs" class="btn btn-secondary btn-sm">Audit</a>
+      <a href="#/roznamcha" class="btn btn-primary btn-sm">Roznamcha</a>
+    </div>
+  `;
 }
 
 // ── KPI Cards ─────────────────────────────────────────────────────────────────
@@ -243,8 +287,8 @@ function refreshKPIs(summaryRes) {
       change: 'Earned to date',
       changeDir: 'up',
       link: '#/reports',
-      color: 'var(--color-accent-purple)',
-      bg: 'var(--color-accent-purple-dim)',
+      color: 'var(--color-accent-navy)',
+      bg: 'var(--color-accent-navy-dim)',
       icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
       </svg>`,
@@ -275,13 +319,13 @@ function refreshKPIs(summaryRes) {
       icon: `<span style="font-size:20px">📦</span>`,
     },
     {
-      label: 'Roznamcha',
-      value: formatCurrency((d.roznamchaToday || {}).combinedTotal || 0, true),
+      label: 'Roznamcha Net',
+      value: formatCurrency((d.roznamchaToday || {}).net ?? ((d.roznamchaToday || {}).paymentTotal || 0) - ((d.roznamchaToday || {}).purchaseTotal || 0) - ((d.roznamchaToday || {}).expenseTotal || 0), true),
       change: 'Today\'s Ledger',
       changeDir: 'up',
       link: '#/roznamcha',
       color: 'var(--color-accent-teal)',
-      bg: 'rgba(20,184,166,0.14)',
+      bg: 'var(--color-accent-teal-dim)',
       icon: `<span style="font-size:20px">📒</span>`,
     },
   ];

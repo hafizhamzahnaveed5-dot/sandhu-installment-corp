@@ -83,10 +83,16 @@ export function formatCurrency(amount, compact = false) {
   }).format(amount);
 }
 
-/** Format a date string to a readable date */
+/** Format a date string to a readable date (avoids UTC day-shift for YYYY-MM-DD). */
 export function formatDate(dateStr) {
   if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('en-PK', {
+  const raw = String(dateStr).trim();
+  const dateOnly = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const date = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(raw);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('en-PK', {
     year: 'numeric', month: 'short', day: 'numeric',
   });
 }

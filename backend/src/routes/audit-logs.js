@@ -19,7 +19,7 @@ router.get('/', requireRole('admin'), asyncHandler(async (req, res) => {
   return ok(res, result.rows.map(mapAudit), pagination(page, pageSize, count.rows[0].total));
 }));
 
-router.post('/', asyncHandler(async (req, res) => {
+router.post('/', requireRole('admin'), asyncHandler(async (req, res) => {
   const { action, entityType, entityId, details } = req.body || {};
   await withTransaction(async (client) => {
     await writeAudit(client, req.user.id, action || 'SYSTEM', entityType || 'Client', entityId || 'unknown', details || 'Client audit entry');

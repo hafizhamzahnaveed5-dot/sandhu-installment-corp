@@ -13,6 +13,7 @@ let state = {
   page: 1,
   search: '',
   status: '',
+  view: '',
   total: 0,
   totalPages: 1,
 };
@@ -25,8 +26,13 @@ export default async function init() {
   const qpStr = hashPart.includes('?') ? hashPart.split('?')[1] : '';
   const qp = new URLSearchParams(qpStr);
   const preStatus = qp.get('status') || '';
+  const preView = qp.get('view') || '';
   if (preStatus) {
     state.status = preStatus;
+    state.page = 1;
+  }
+  if (preView) {
+    state.view = preView;
     state.page = 1;
   }
 
@@ -34,10 +40,11 @@ export default async function init() {
   content.innerHTML = `
     <div class="page-header">
       <div class="page-header-left">
-        <h1>Customers</h1>
+        <h1>${state.view === 'costs' ? 'Customer Purchase Cost View' : 'Customers'}</h1>
         <p id="customer-count">Loading...</p>
       </div>
-      <div class="page-header-actions">
+      <div class="page-header-actions" style="display:flex;gap:8px;align-items:center">
+        ${state.view === 'costs' ? `<a class="btn btn-ghost btn-sm" href="#/customers">Standard View</a>` : ''}
         <button class="btn btn-secondary btn-sm" id="export-csv-btn">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export CSV
@@ -55,13 +62,13 @@ export default async function init() {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        <input type="text" id="search-input" placeholder="Search by name, phone, or city..."/>
+        <input type="text" id="search-input" placeholder="Search by name, phone, or city..." value="${state.search}" />
       </div>
       <div class="flex gap-2">
-        <button class="filter-chip active" data-status="">All</button>
-        <button class="filter-chip" data-status="active">Active</button>
-        <button class="filter-chip" data-status="inactive">Inactive</button>
-        <button class="filter-chip" data-status="blacklisted">Blacklisted</button>
+        <button class="filter-chip ${state.status === '' ? 'active' : ''}" data-status="">All</button>
+        <button class="filter-chip ${state.status === 'active' ? 'active' : ''}" data-status="active">Active</button>
+        <button class="filter-chip ${state.status === 'inactive' ? 'active' : ''}" data-status="inactive">Inactive</button>
+        <button class="filter-chip ${state.status === 'blacklisted' ? 'active' : ''}" data-status="blacklisted">Blacklisted</button>
       </div>
     </div>
 
@@ -75,13 +82,14 @@ export default async function init() {
               <th>Phone</th>
               <th class="hide-mobile">City</th>
               <th class="hide-mobile">Outstanding</th>
+              ${state.view === 'costs' ? '<th class="hide-mobile">Purchase Cost</th><th class="hide-mobile">Cost Gap</th>' : ''}
               <th>Status</th>
               <th class="hide-mobile">Joined</th>
               <th></th>
             </tr>
           </thead>
           <tbody id="customers-tbody">
-            ${renderTableSkeleton(7, 7)}
+            ${renderTableSkeleton(7, state.view === 'costs' ? 9 : 7)}
           </tbody>
         </table>
       </div>
@@ -126,6 +134,7 @@ async function loadCustomers() {
     status: state.status,
     page: state.page,
     pageSize: Config.DEFAULT_PAGE_SIZE,
+    view: state.view,
   });
 
   if (!result.success) {
@@ -137,7 +146,7 @@ async function loadCustomers() {
   state.totalPages = result.pagination.totalPages;
 
   document.getElementById('customer-count').textContent =
-    `${state.total} customer${state.total !== 1 ? 's' : ''}${state.search ? ' matching "' + state.search + '"' : ''}`;
+    `${state.total} customer${state.total !== 1 ? 's' : ''}${state.search ? ' matching "' + state.search + '"' : ''}${state.view === 'costs' ? ' — purchase cost summary' : ''}`;
 
   renderTable(result.data);
   renderPagination();
@@ -149,7 +158,7 @@ function renderTable(customers) {
 
   if (customers.length === 0) {
     tbody.innerHTML = `
-      <tr><td colspan="7">
+      <tr><td colspan="${state.view === 'costs' ? 9 : 7}">
         <div class="empty-state">
           <span style="font-size:40px">👥</span>
           <h3>No customers found</h3>
@@ -176,6 +185,10 @@ function renderTable(customers) {
       <td class="hide-mobile" style="font-weight:600;font-family:var(--font-mono)">
         ${c.totalOutstanding > 0 ? formatCurrency(c.totalOutstanding) : '<span style="color:var(--color-accent-green)">Cleared</span>'}
       </td>
+      ${state.view === 'costs' ? `
+      <td class="hide-mobile" style="font-weight:600;font-family:var(--font-mono);color:var(--color-accent-yellow)">${c.totalPurchaseCost ? formatCurrency(c.totalPurchaseCost) : formatCurrency(0)}</td>
+      <td class="hide-mobile" style="font-weight:600;font-family:var(--font-mono);color:var(--color-accent-orange)">${formatCurrency(c.totalCostGap || 0)}</td>
+      ` : ''}
       <td><span class="badge badge-${c.status}">${capitalize(c.status)}</span></td>
       <td class="hide-mobile secondary">${formatDate(c.createdAt)}</td>
       <td>
@@ -265,14 +278,16 @@ function showAddCustomerModal() {
 }
 
 function exportCsv() {
-  CustomersService.list({ pageSize: 9999 }).then(result => {
+  CustomersService.list({ pageSize: 9999, view: state.view }).then(result => {
     if (!result.success) return;
     const rows = [
-      ['Full Name', 'Phone', 'Email', 'City', 'Status', 'Outstanding', 'Joined'],
-      ...result.data.map(c => [
-        c.fullName, c.phone, c.email, c.city, c.status,
-        c.totalOutstanding, new Date(c.createdAt).toLocaleDateString(),
-      ]),
+      state.view === 'costs'
+        ? ['Full Name', 'Phone', 'Email', 'City', 'Status', 'Outstanding', 'Purchase Cost', 'Cost Gap', 'Joined']
+        : ['Full Name', 'Phone', 'Email', 'City', 'Status', 'Outstanding', 'Joined'],
+      ...result.data.map(c => state.view === 'costs'
+        ? [c.fullName, c.phone, c.email, c.city, c.status, c.totalOutstanding, c.totalPurchaseCost, c.totalCostGap, new Date(c.createdAt).toLocaleDateString()]
+        : [c.fullName, c.phone, c.email, c.city, c.status, c.totalOutstanding, new Date(c.createdAt).toLocaleDateString()]
+      ),
     ];
     const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });

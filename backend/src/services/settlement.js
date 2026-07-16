@@ -16,6 +16,7 @@
  */
 
 import { newId, receiptNumber } from '../utils/ids.js';
+import { pgDateOnly, todayDateOnly, toDateOnly } from '../utils/dates.js';
 import { writeAudit } from './audit.js';
 
 /**
@@ -26,17 +27,14 @@ import { writeAudit } from './audit.js';
  * @param {Date|string} [asOfDate=today]
  */
 export async function calculateSettlementBreakdown(client, planId, asOfDate = new Date()) {
-  const asOfStr = (asOfDate instanceof Date ? asOfDate : new Date(asOfDate))
-    .toISOString()
-    .slice(0, 10);
+  const asOfStr = toDateOnly(asOfDate) || todayDateOnly();
 
   const { rows } = await client.query(
     `SELECT * FROM installment_schedules WHERE plan_id = $1 ORDER BY installment_number ASC`,
     [planId],
   );
 
-  const dueDateOf = (r) =>
-    String(r.due_date?.toISOString?.().slice(0, 10) ?? r.due_date).slice(0, 10);
+  const dueDateOf = (r) => pgDateOnly(r.due_date) || '';
 
   const openRows = rows.filter((r) => r.status !== 'paid' && r.status !== 'settled');
 
@@ -90,7 +88,7 @@ export async function performEarlySettlement(client, {
   paidAt = new Date(),
 }) {
   const paidAtTs = paidAt instanceof Date ? paidAt : new Date(paidAt);
-  const paidAtDate = paidAtTs.toISOString().slice(0, 10);
+  const paidAtDate = toDateOnly(paidAt) || todayDateOnly();
   const paymentId = newId('pay');
 
   // Allocate a receipt number from the shared sequence

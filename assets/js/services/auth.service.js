@@ -112,7 +112,7 @@ const AuthService = {
 
     // Pages customers cannot access
     const customerBlocked = [
-      'customers', 'installments', 'products',
+      'customers', 'installments', 'products', 'payments', 'roznamcha',
       'reports', 'analytics', 'users', 'audit-logs',
     ];
     if (role === 'customer' && customerBlocked.some(p => page.startsWith(p))) return false;
@@ -149,8 +149,8 @@ const AuthService = {
 
       const permMap = {
         admin:    ['*'],
-        manager:  ['customers.read','customers.write','installments.*','payments.*','reports.read'],
-        agent:    ['customers.read','installments.read','payments.create'],
+        manager:  ['customers.read','customers.write','installments.*','payments.*','reports.read','products.*','roznamcha.*'],
+        agent:    ['customers.read','installments.read','payments.create','roznamcha.read'],
         customer: ['my-plan.read','my-payments.read'],
       };
       const newUser = {
@@ -190,8 +190,8 @@ const AuthService = {
 
       const permMap = {
         admin:    ['*'],
-        manager:  ['customers.read','customers.write','installments.*','payments.*','reports.read'],
-        agent:    ['customers.read','installments.read','payments.create'],
+        manager:  ['customers.read','customers.write','installments.*','payments.*','reports.read','products.*','roznamcha.*'],
+        agent:    ['customers.read','installments.read','payments.create','roznamcha.read'],
         customer: ['my-plan.read','my-payments.read'],
       };
 

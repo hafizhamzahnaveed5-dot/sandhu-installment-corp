@@ -147,15 +147,18 @@ export function openCustomerFormModal({ mode = 'add', customer = null, onSaved =
   });
 
   modal.backdrop.querySelector('#delete-customer-btn')?.addEventListener('click', async () => {
+    const settled = Number(customer?.totalOutstanding || 0) === 0;
     const ok = await Modal.confirm(
       'Delete Customer?',
-      'Are you sure? This cannot be undone. Customers with installment history cannot be permanently deleted.'
+      settled
+        ? 'This customer has 0 outstanding. Admin delete will remove their settled history permanently.'
+        : 'Are you sure? This cannot be undone. Customers with outstanding balance cannot be deleted.'
     );
     if (!ok) return;
 
     const btn = modal.backdrop.querySelector('#delete-customer-btn');
     btn.classList.add('loading');
-    const result = await CustomersService.delete(customer.id);
+    const result = await CustomersService.delete(customer.id, { forceZero: settled && AuthService.isAdmin() });
     btn.classList.remove('loading');
 
     if (result.success) {

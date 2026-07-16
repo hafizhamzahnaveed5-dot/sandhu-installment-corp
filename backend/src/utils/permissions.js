@@ -1,7 +1,13 @@
 export const rolePermissions = {
   admin: ['*'],
-  manager: ['customers.read', 'customers.write', 'installments.*', 'payments.*', 'reports.read'],
-  agent: ['customers.read', 'installments.read', 'payments.create'],
+  manager: [
+    'customers.read', 'customers.write',
+    'installments.*', 'payments.*',
+    'reports.read', 'products.*', 'roznamcha.*',
+  ],
+  agent: [
+    'customers.read', 'installments.read', 'payments.create', 'roznamcha.read',
+  ],
   customer: ['my-plan.read', 'my-payments.read'],
 };
 

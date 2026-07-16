@@ -22,16 +22,14 @@ WHERE p.id = s.plan_id
 
 -- Step 3: Audit log (optional - depends on audit_logs table existence)
 -- Document which plans were corrected
-INSERT INTO audit_logs (user_id, action, entity_type, entity_id, old_value, new_value, notes, created_at)
-SELECT 
+INSERT INTO audit_logs (user_id, action, entity_type, entity_id, timestamp, details)
+SELECT
   'SYSTEM',
   'UPDATE',
   'InstallmentPlan',
   ip.id,
-  ROUND((ip.principal_amount - ip.down_payment) * (ip.interest_or_markup / 100.0), 2)::text,
-  ip.markup_amount::text,
-  'Fixed markup calculation: now uses principal_amount instead of (principal_amount - down_payment)',
-  NOW()
+  NOW(),
+  'Fixed markup calculation: old markup=' || ROUND((ip.principal_amount - ip.down_payment) * (ip.interest_or_markup / 100.0), 2)::text || ', new markup=' || ip.markup_amount::text
 FROM installment_plans ip
 WHERE ip.interest_or_markup > 0
   AND ip.down_payment > 0;
