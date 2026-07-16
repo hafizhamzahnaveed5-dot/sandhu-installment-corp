@@ -445,7 +445,7 @@ router.get('/:id/settlement-preview', requireMinRole('manager'), asyncHandler(as
  * Body: { method: 'cash'|'bank'|'online', notes?: string }
  */
 router.post('/:id/settle', requireMinRole('manager'), asyncHandler(async (req, res) => {
-  const { method, notes, paidAt } = req.body || {};
+  const { method, notes, paidAt, amount: amountBody } = req.body || {};
   if (!method) return fail(res, 400, 'Payment method is required.');
   if (!['cash', 'bank', 'online'].includes(method)) return fail(res, 400, 'Invalid payment method.');
 
@@ -468,10 +468,17 @@ router.post('/:id/settle', requireMinRole('manager'), asyncHandler(async (req, r
       throw Object.assign(new Error('All installments are already paid — nothing to settle.'), { status: 400 });
     }
 
+    const receivedAmount = amountBody === undefined || amountBody === null || amountBody === ''
+      ? breakdown.settlementAmount
+      : Number(amountBody);
+    if (!Number.isFinite(receivedAmount) || receivedAmount <= 0) {
+      throw Object.assign(new Error('Amount received must be greater than 0.'), { status: 400 });
+    }
+
     const result = await performEarlySettlement(client, {
       planId: req.params.id,
       customerId: plan.customer_id,
-      amount: breakdown.settlementAmount,
+      amount: receivedAmount,
       method,
       userId: req.user.id,
       notes,

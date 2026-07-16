@@ -403,7 +403,7 @@ const InstallmentsService = {
    * @param {string} planId
    * @param {{ method: string, notes?: string }} opts
    */
-  async settleEarly(planId, { method, notes = '', paidAt = '' } = {}) {
+  async settleEarly(planId, { method, notes = '', paidAt = '', amount = null } = {}) {
     if (Config.FEATURE_FLAGS.MOCK_MODE) {
       await delay(600);
       const planIdx = mockPlans.findIndex(p => p.id === planId);
@@ -415,6 +415,10 @@ const InstallmentsService = {
       const preview = await this.getSettlementPreview(planId);
       if (!preview.success) return preview;
       const b = preview.data;
+      const paidAmount = Number(amount ?? b.settlementAmount);
+      if (!Number.isFinite(paidAmount) || paidAmount <= 0) {
+        return { success: false, data: null, error: 'Amount received must be greater than 0.' };
+      }
 
       const today = paidAt || new Date().toISOString().slice(0, 10);
 
@@ -436,7 +440,7 @@ const InstallmentsService = {
         id: `pay-settle-${Date.now()}`,
         planId,
         scheduleId: null,
-        amount: b.settlementAmount,
+        amount: paidAmount,
         method,
         notes,
         isEarlySettlement: true,
@@ -447,11 +451,11 @@ const InstallmentsService = {
       };
       mockPayments.push(payment);
 
-      await AuditService.log('UPDATE', 'InstallmentPlan', planId, `Plan settled early: PKR ${b.settlementAmount}; markup waived PKR ${b.markupToWaive}`);
+      await AuditService.log('UPDATE', 'InstallmentPlan', planId, `Plan settled early: PKR ${paidAmount}; markup waived PKR ${b.markupToWaive}`);
       EventBus.emit('payment:recorded', payment);
       return { success: true, data: payment, error: null };
     }
-    return api.post(`/installment-plans/${planId}/settle`, { method, notes, paidAt });
+    return api.post(`/installment-plans/${planId}/settle`, { method, notes, paidAt, amount });
   },
 };
 

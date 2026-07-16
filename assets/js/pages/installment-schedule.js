@@ -428,8 +428,9 @@ async function showSettlementModal(plan, onSuccess) {
   // Open modal immediately with a loading state
   const modal = Modal.create({
     title: '✦ Settle Remaining Balance',
+    size: 'lg',
     content: `
-      <div id="settlement-modal-body" style="min-height:160px;display:flex;align-items:center;justify-content:center">
+      <div id="settlement-modal-body">
         <div class="skeleton skeleton-text" style="width:100%;height:120px;border-radius:var(--radius-md)"></div>
       </div>`,
     footer: `
@@ -444,10 +445,11 @@ async function showSettlementModal(plan, onSuccess) {
 
   // Fetch live preview
   const previewRes = await InstallmentsService.getSettlementPreview(plan.id);
+  const body = modal.backdrop.querySelector('#settlement-modal-body');
 
   if (!previewRes.success) {
-    modal.backdrop.querySelector('#settlement-modal-body').innerHTML = `
-      <div class="empty-state" style="padding:24px">
+    body.innerHTML = `
+      <div class="empty-state" style="padding:24px;text-align:center">
         <span style="font-size:32px">⚠️</span>
         <p style="color:var(--color-accent-red)">${previewRes.error || 'Failed to load settlement data.'}</p>
       </div>`;
@@ -457,61 +459,59 @@ async function showSettlementModal(plan, onSuccess) {
   const b = previewRes.data;
 
   if (!b.hasOpenRows) {
-    modal.backdrop.querySelector('#settlement-modal-body').innerHTML = `
-      <div class="empty-state" style="padding:24px">
+    body.innerHTML = `
+      <div class="empty-state" style="padding:24px;text-align:center">
         <span style="font-size:32px">✅</span>
         <p>All installments are already paid or settled — nothing to settle.</p>
       </div>`;
     return;
   }
 
-  // Render the breakdown
-  modal.backdrop.querySelector('#settlement-modal-body').innerHTML = `
-    <p style="font-size:14px;color:var(--color-text-secondary);margin-bottom:16px">
-      The system has calculated the exact amount to fully settle this plan as of today
-      (<strong>${b.asOfDate}</strong>). Review and confirm below.
+  const suggested = Number(b.settlementAmount || 0);
+
+  // Render clear stacked layout (never use flex row on this container)
+  body.innerHTML = `
+    <p style="font-size:14px;color:var(--color-text-secondary);margin:0 0 16px;line-height:1.5">
+      Calculated settlement as of <strong>${formatDate(b.asOfDate)}</strong>.
+      Enter the amount you received, then confirm.
     </p>
 
-    <!-- Breakdown table -->
-    <div style="
-      border-radius:var(--radius-md);
-      overflow:hidden;
-      border:1px solid var(--color-border);
-      margin-bottom:20px">
-      <div style="display:flex;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--color-border)">
-        <span style="color:var(--color-text-secondary);font-size:13px">Remaining Principal</span>
-        <span style="font-weight:600;font-family:var(--font-mono)">${formatCurrency(b.remainingPrincipal)}</span>
+    <div style="border:1px solid var(--color-border);border-radius:var(--radius-md);overflow:hidden;margin-bottom:20px">
+      <div class="settle-row">
+        <span>Remaining Principal</span>
+        <strong class="mono">${formatCurrency(b.remainingPrincipal)}</strong>
       </div>
-      <div style="display:flex;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--color-border)">
-        <span style="color:var(--color-text-secondary);font-size:13px">
-          Markup Earned to Date
-          <span style="font-size:11px;opacity:.7">(periods already due — must be paid)</span>
-        </span>
-        <span style="font-weight:600;font-family:var(--font-mono);color:var(--color-accent-amber,#f59e0b)">${formatCurrency(b.markupEarnedToDate)}</span>
+      <div class="settle-row">
+        <span>Markup Due Now <small>(already earned)</small></span>
+        <strong class="mono" style="color:var(--color-accent-amber,#f59e0b)">${formatCurrency(b.markupEarnedToDate)}</strong>
       </div>
-      <div style="display:flex;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--color-border);background:rgba(34,197,94,.05)">
-        <span style="color:var(--color-text-secondary);font-size:13px">
-          Markup to Be Waived
-          <span style="font-size:11px;opacity:.7">(future periods — fully forgiven)</span>
-        </span>
-        <span style="font-weight:600;font-family:var(--font-mono);color:var(--color-accent-green)">
-          − ${formatCurrency(b.markupToWaive)}
-        </span>
+      <div class="settle-row" style="background:rgba(34,197,94,.06)">
+        <span>Markup Waived <small>(future — forgiven)</small></span>
+        <strong class="mono" style="color:var(--color-accent-green)">− ${formatCurrency(b.markupToWaive)}</strong>
       </div>
-      <div style="display:flex;justify-content:space-between;padding:14px 16px;background:var(--color-bg-secondary)">
-        <span style="font-weight:700;font-size:15px">Total to Pay Now</span>
-        <span style="font-weight:800;font-size:18px;font-family:var(--font-mono);color:var(--color-accent-blue)">
-          ${formatCurrency(b.settlementAmount)}
-        </span>
+      <div class="settle-row" style="background:var(--color-bg-secondary)">
+        <span style="font-weight:700">Suggested Total</span>
+        <strong class="mono" style="font-size:18px;color:var(--color-accent-blue)">${formatCurrency(suggested)}</strong>
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="form-group" style="margin:0">
+    <div class="form-group" style="margin-bottom:16px">
+      <label class="form-label" for="settle-amount">
+        Amount Received (PKR) <span class="required">*</span>
+      </label>
+      <input type="number" id="settle-amount" class="form-control"
+        min="1" step="0.01" required
+        value="${suggested}"
+        style="font-size:18px;font-weight:700;font-family:var(--font-mono)" />
+      <small class="form-help">Type the cash/transfer amount you actually received from the customer.</small>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div class="form-group" style="margin:0;min-width:0">
         <label class="form-label" for="settle-date">Settlement Date</label>
         <input type="date" id="settle-date" class="form-control" value="${b.asOfDate || new Date().toISOString().slice(0,10)}"/>
       </div>
-      <div class="form-group" style="margin:0">
+      <div class="form-group" style="margin:0;min-width:0">
         <label class="form-label" for="settle-method">Payment Method <span class="required">*</span></label>
         <select id="settle-method" class="form-control">
           <option value="cash">Cash</option>
@@ -519,21 +519,20 @@ async function showSettlementModal(plan, onSuccess) {
           <option value="online">Online (JazzCash / Easypaisa)</option>
         </select>
       </div>
-      <div class="form-group" style="margin:0;grid-column:1/-1">
-        <label class="form-label" for="settle-notes">Notes</label>
-        <input type="text" id="settle-notes" class="form-control" placeholder="Optional reference / remarks"/>
-      </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom:16px">
+      <label class="form-label" for="settle-notes">Notes</label>
+      <input type="text" id="settle-notes" class="form-control" placeholder="Optional reference / remarks"/>
     </div>
 
     <div style="
-      margin-top:16px;padding:12px 14px;
-      border-radius:var(--radius-sm);
-      background:rgba(245,158,11,.08);
-      border:1px solid rgba(245,158,11,.3);
-      font-size:13px;color:var(--color-text-secondary)">
-      ⚠️ This action is <strong>irreversible</strong>. It will mark the plan as
-      <strong>Completed</strong>, close all ${b.openRowCount} remaining installment
-      row${b.openRowCount !== 1 ? 's' : ''}, and record one consolidated payment entry.
+      padding:12px 14px;border-radius:var(--radius-sm);
+      background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);
+      font-size:13px;color:var(--color-text-secondary);line-height:1.45">
+      ⚠️ Confirming will mark the plan <strong>Completed</strong>, close
+      ${b.openRowCount} remaining installment${b.openRowCount !== 1 ? 's' : ''},
+      and record one payment for the amount received.
     </div>
   `;
 
@@ -542,14 +541,22 @@ async function showSettlementModal(plan, onSuccess) {
   confirmBtn.disabled = false;
 
   confirmBtn.addEventListener('click', async () => {
+    const amountRaw = modal.backdrop.querySelector('#settle-amount')?.value;
+    const amount = parseFloat(amountRaw);
     const method = modal.backdrop.querySelector('#settle-method').value;
     const notes  = modal.backdrop.querySelector('#settle-notes').value;
     const paidAt = modal.backdrop.querySelector('#settle-date')?.value || b.asOfDate;
 
+    if (!Number.isFinite(amount) || amount <= 0) {
+      Toast.warning('Amount required', 'Enter the amount you received from the customer.');
+      modal.backdrop.querySelector('#settle-amount')?.focus();
+      return;
+    }
+
     confirmBtn.classList.add('loading');
     confirmBtn.disabled = true;
 
-    const result = await InstallmentsService.settleEarly(plan.id, { method, notes, paidAt });
+    const result = await InstallmentsService.settleEarly(plan.id, { method, notes, paidAt, amount });
 
     confirmBtn.classList.remove('loading');
     confirmBtn.disabled = false;
@@ -557,7 +564,7 @@ async function showSettlementModal(plan, onSuccess) {
     if (result.success) {
       Toast.success(
         '✨ Plan Settled',
-        `${formatCurrency(b.settlementAmount)} received · ${formatCurrency(b.markupToWaive)} markup waived`,
+        `${formatCurrency(amount)} received · ${formatCurrency(b.markupToWaive)} markup waived`,
         { duration: 6000 },
       );
       modal.destroy();
