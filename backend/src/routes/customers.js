@@ -46,7 +46,7 @@ router.get('/', asyncHandler(async (req, res) => {
          ) tc ON tc.customer_id = c.id
          LEFT JOIN (
            SELECT ip.customer_id,
-                  string_agg(DISTINCT COALESCE(pr.name, 'Custom Plan'), ', ' ORDER BY COALESCE(pr.name, 'Custom Plan')) AS product_names
+                  string_agg(DISTINCT COALESCE(NULLIF(TRIM(ip.product_name), ''), pr.name, 'Custom Plan'), ', ') AS product_names
            FROM installment_plans ip
            LEFT JOIN products pr ON pr.id = ip.product_id
            GROUP BY ip.customer_id
@@ -58,7 +58,7 @@ router.get('/', asyncHandler(async (req, res) => {
          FROM customers c
          LEFT JOIN (
            SELECT ip.customer_id,
-                  string_agg(DISTINCT COALESCE(pr.name, 'Custom Plan'), ', ' ORDER BY COALESCE(pr.name, 'Custom Plan')) AS product_names
+                  string_agg(DISTINCT COALESCE(NULLIF(TRIM(ip.product_name), ''), pr.name, 'Custom Plan'), ', ') AS product_names
            FROM installment_plans ip
            LEFT JOIN products pr ON pr.id = ip.product_id
            GROUP BY ip.customer_id

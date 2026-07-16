@@ -5,7 +5,6 @@
 import { renderNavbar } from '../components/navbar.js';
 import CustomersService from '../services/customers.service.js';
 import InstallmentsService from '../services/installments.service.js';
-import ProductsService from '../services/products.service.js';
 import Toast from '../components/toast.js';
 import { formatCurrency } from '../config.js';
 
@@ -14,13 +13,8 @@ export default async function init() {
 
   const content = document.getElementById('page-content');
 
-  // Load customer and product lists for selection dropdown
-  const [customersRes, productsRes] = await Promise.all([
-    CustomersService.list({ pageSize: 999 }),
-    ProductsService.listActive()
-  ]);
+  const customersRes = await CustomersService.list({ pageSize: 999 });
   const customers = customersRes.data || [];
-  const products = productsRes.data || [];
 
   // Extract URL parameters if preselected
   const urlParams = new URLSearchParams(window.location.hash.split('?')[1]);
@@ -74,15 +68,10 @@ export default async function init() {
             </div>
 
             <div class="form-group full-width">
-              <label class="form-label" for="plan-product">Select Product (Optional)</label>
-              <select id="plan-product" class="form-control">
-                <option value="">-- No Product / Custom Amount --</option>
-                ${products.map(p => `
-                  <option value="${p.id}" data-price="${p.price}">
-                    ${p.name} - Price: ${formatCurrency(p.price)}
-                  </option>
-                `).join('')}
-              </select>
+              <label class="form-label" for="plan-product-name">Product Name</label>
+              <input type="text" id="plan-product-name" class="form-control"
+                placeholder="e.g. Samsung Fridge, Honda Bike, Sofa Set" maxlength="200" />
+              <small class="form-help">Type what you bought for the customer (no stock catalog needed).</small>
             </div>
           </div>
 
@@ -212,7 +201,6 @@ export default async function init() {
   const step1Ind  = document.getElementById('step-1-indicator');
   const step2Ind  = document.getElementById('step-2-indicator');
 
-  const prodSelect = document.getElementById('plan-product');
   const principalInput = document.getElementById('plan-principal');
   const customerSelect = document.getElementById('plan-customer');
   const accountInput = document.getElementById('plan-account-id');
@@ -254,16 +242,6 @@ export default async function init() {
     const opt = customerSelect.options[customerSelect.selectedIndex];
     if (opt?.dataset?.account) accountInput.value = opt.dataset.account;
   }
-
-  // Product selection fills price
-  prodSelect.addEventListener('change', () => {
-    const selectedOption = prodSelect.options[prodSelect.selectedIndex];
-    const price = selectedOption.dataset.price;
-    if (price) {
-      principalInput.value = price;
-      recalculate();
-    }
-  });
 
   // Financial inputs listener
   ['plan-principal', 'plan-discount', 'plan-purchase-cost', 'plan-file-fee', 'plan-downpayment', 'plan-markup', 'plan-installment-amount'].forEach(id => {
@@ -312,7 +290,7 @@ export default async function init() {
     const btn = document.getElementById('btn-submit-plan');
 
     const customerId = document.getElementById('plan-customer').value;
-    const productId = document.getElementById('plan-product').value;
+    const productName = (document.getElementById('plan-product-name')?.value || '').trim();
     const principalAmount = parseFloat(principalInput.value);
     const purchaseCost = parseFloat(document.getElementById('plan-purchase-cost').value) || 0;
     const fileFee = parseFloat(document.getElementById('plan-file-fee').value) || 0;
@@ -365,7 +343,8 @@ export default async function init() {
 
     const result = await InstallmentsService.createPlan({
       customerId,
-      productId: productId || null,
+      productId: null,
+      productName: productName || null,
       principalAmount: principalAmount,
       discountAmount,
       purchaseCost,

@@ -90,7 +90,7 @@ function renderShell(user) {
               { label: 'Add Customer',   icon: '👤', route: 'customers' },
               { label: 'Create Plan',    icon: '📋', route: 'installments/create' },
               { label: 'View Payments',  icon: '💳', route: 'payments' },
-              { label: 'Products',       icon: '📦', route: 'products' },
+              { label: 'Roznamcha',      icon: '📒', route: 'roznamcha' },
               { label: 'Reports',        icon: '📊', route: 'reports' },
             ].map(a => `
               <a href="#/${a.route}"

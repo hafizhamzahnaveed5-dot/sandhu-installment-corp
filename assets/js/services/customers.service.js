@@ -40,7 +40,8 @@ const CustomersService = {
         data = data.filter(c =>
           c.fullName.toLowerCase().includes(q) ||
           c.phone.includes(q) ||
-          c.city.toLowerCase().includes(q)
+          (c.city || '').toLowerCase().includes(q) ||
+          String(c.accountNumber || '').toLowerCase().includes(q)
         );
       }
       if (status) data = data.filter(c => c.status === status);

@@ -36,6 +36,9 @@ function translateSqlError(error) {
     if (typeof error.message === 'string' && /file_fee/i.test(error.message)) {
       return Object.assign(new Error('Database schema missing required column file_fee. Run the latest migration and redeploy the backend.'), { status: 500 });
     }
+    if (typeof error.message === 'string' && /product_name/i.test(error.message)) {
+      return Object.assign(new Error('Database schema missing product_name. Run migration 013_plan_product_name.sql and redeploy.'), { status: 500 });
+    }
     return Object.assign(new Error('Database schema is missing a required column. Run migrations and retry.'), { status: 500 });
   }
 
@@ -74,14 +77,32 @@ router.get('/', asyncHandler(async (req, res) => {
       where.push(`p.status = $${values.length}`);
     }
   }
+  if (req.query.search) {
+    values.push(`%${String(req.query.search).trim()}%`);
+    where.push(`(
+      p.id ILIKE $${values.length}
+      OR COALESCE(p.product_name, '') ILIKE $${values.length}
+      OR EXISTS (
+        SELECT 1 FROM customers c2
+        WHERE c2.id = p.customer_id
+          AND (
+            c2.full_name ILIKE $${values.length}
+            OR COALESCE(c2.account_number, '') ILIKE $${values.length}
+            OR COALESCE(c2.phone, '') ILIKE $${values.length}
+          )
+      )
+    )`);
+  }
 
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const count = await pool.query(`SELECT count(*)::int AS total FROM installment_plans p ${whereSql}`, values);
   const rows = await pool.query(
-    `SELECT p.*, c.full_name AS customer_name,
+    `SELECT p.*, c.full_name AS customer_name, c.account_number AS customer_account_number,
+            pr.name AS catalog_product_name,
             (SELECT COALESCE(sum(markup_earned), 0) FROM installment_schedules WHERE plan_id = p.id) AS total_markup_earned
      FROM installment_plans p
      JOIN customers c ON c.id = p.customer_id
+     LEFT JOIN products pr ON pr.id = p.product_id
      ${whereSql}
      ORDER BY p.created_at DESC
      LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
@@ -97,9 +118,11 @@ router.get('/:id', asyncHandler(async (req, res) => {
   if (!access.allowed) return fail(res, 403, 'Customers can only access their own installment plans.');
 
   const result = await pool.query(
-    `SELECT p.*, c.full_name AS customer_name
+    `SELECT p.*, c.full_name AS customer_name, c.account_number AS customer_account_number,
+            pr.name AS catalog_product_name
      FROM installment_plans p
      JOIN customers c ON c.id = p.customer_id
+     LEFT JOIN products pr ON pr.id = p.product_id
      WHERE p.id = $1`,
     [req.params.id]
   );
@@ -163,24 +186,27 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
 
   const round2 = (value) => Number(Number(value || 0).toFixed(2));
 
-  // Plan ID matches customer's manual account/customer ID when available
+  // Plan ID must match customer's manual account/customer ID
   const customerRow = await pool.query('SELECT account_number FROM customers WHERE id = $1', [req.body.customerId]);
   if (!customerRow.rowCount) return fail(res, 404, 'Customer not found.');
   const accountNumber = String(customerRow.rows[0].account_number || '').trim();
-  let id = accountNumber || newId('plan');
-  if (accountNumber) {
-    const taken = await pool.query('SELECT id FROM installment_plans WHERE id = $1', [accountNumber]);
-    if (taken.rowCount) {
-      let n = 2;
-      while (n < 1000) {
-        const candidate = `${accountNumber}-${n}`;
-        const exists = await pool.query('SELECT id FROM installment_plans WHERE id = $1', [candidate]);
-        if (!exists.rowCount) { id = candidate; break; }
-        n += 1;
-      }
-      if (n >= 1000) id = newId('plan');
-    }
+  if (!accountNumber) {
+    return fail(res, 400, 'Customer must have a Customer ID / Account No. before creating a plan.');
   }
+  let id = accountNumber;
+  const taken = await pool.query('SELECT id FROM installment_plans WHERE id = $1', [accountNumber]);
+  if (taken.rowCount) {
+    let n = 2;
+    while (n < 1000) {
+      const candidate = `${accountNumber}-${n}`;
+      const exists = await pool.query('SELECT id FROM installment_plans WHERE id = $1', [candidate]);
+      if (!exists.rowCount) { id = candidate; break; }
+      n += 1;
+    }
+    if (n >= 1000) return fail(res, 400, 'Too many plans for this Customer ID. Use a different account number.');
+  }
+
+  const productName = String(req.body.productName || '').trim() || null;
 
   const principalAmount    = Number(req.body.principalAmount);
   const discountAmount     = Number(req.body.discountAmount ?? 0);
@@ -270,34 +296,58 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
     );
     const hasFileFeeColumn = fileFeeColumn.rowCount > 0;
 
-    const insertSqlWithFileFee = `INSERT INTO installment_plans
-      (id, customer_id, product_id, principal_amount, purchase_cost, file_fee, down_payment, number_of_installments,
-       installment_amount, frequency, start_date, status, interest_or_markup, markup_amount, outstanding_balance, discount_amount, created_by)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'active',$12,$13,$14,$15,$16)
-      RETURNING *`;
-
-    const insertSqlWithoutFileFee = `INSERT INTO installment_plans
-      (id, customer_id, product_id, principal_amount, purchase_cost, down_payment, number_of_installments,
-       installment_amount, frequency, start_date, status, interest_or_markup, markup_amount, outstanding_balance, discount_amount, created_by)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'active',$11,$12,$13,$14,$15)
-      RETURNING *`;
-
-    const insertParamsWithFileFee = [
-      id, req.body.customerId, req.body.productId || null, req.body.principalAmount, purchaseCost, fileFee, req.body.downPayment,
-      numberOfInstallments, req.body.installmentAmount, req.body.frequency, req.body.startDate,
-      interestRate, totalMarkup, outstandingBalance, discountAmount, req.user.id,
-    ];
-
-    const insertParamsWithoutFileFee = [
-      id, req.body.customerId, req.body.productId || null, req.body.principalAmount, purchaseCost, req.body.downPayment,
-      numberOfInstallments, req.body.installmentAmount, req.body.frequency, req.body.startDate,
-      interestRate, totalMarkup, outstandingBalance, discountAmount, req.user.id,
-    ];
-
-    const inserted = await client.query(
-      hasFileFeeColumn ? insertSqlWithFileFee : insertSqlWithoutFileFee,
-      hasFileFeeColumn ? insertParamsWithFileFee : insertParamsWithoutFileFee
+    const productNameColumn = await client.query(
+      `SELECT 1 FROM information_schema.columns
+       WHERE table_name = $1 AND column_name = $2
+       LIMIT 1`,
+      ['installment_plans', 'product_name']
     );
+    const hasProductNameColumn = productNameColumn.rowCount > 0;
+
+    // Prefer free-text product name; do not require catalog product_id
+    const productId = productName ? null : (req.body.productId || null);
+
+    let inserted;
+    if (hasFileFeeColumn && hasProductNameColumn) {
+      inserted = await client.query(
+        `INSERT INTO installment_plans
+          (id, customer_id, product_id, product_name, principal_amount, purchase_cost, file_fee, down_payment, number_of_installments,
+           installment_amount, frequency, start_date, status, interest_or_markup, markup_amount, outstanding_balance, discount_amount, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'active',$13,$14,$15,$16,$17)
+         RETURNING *`,
+        [
+          id, req.body.customerId, productId, productName, req.body.principalAmount, purchaseCost, fileFee, req.body.downPayment,
+          numberOfInstallments, req.body.installmentAmount, req.body.frequency, req.body.startDate,
+          interestRate, totalMarkup, outstandingBalance, discountAmount, req.user.id,
+        ]
+      );
+    } else if (hasFileFeeColumn) {
+      inserted = await client.query(
+        `INSERT INTO installment_plans
+          (id, customer_id, product_id, principal_amount, purchase_cost, file_fee, down_payment, number_of_installments,
+           installment_amount, frequency, start_date, status, interest_or_markup, markup_amount, outstanding_balance, discount_amount, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'active',$12,$13,$14,$15,$16)
+         RETURNING *`,
+        [
+          id, req.body.customerId, productId, req.body.principalAmount, purchaseCost, fileFee, req.body.downPayment,
+          numberOfInstallments, req.body.installmentAmount, req.body.frequency, req.body.startDate,
+          interestRate, totalMarkup, outstandingBalance, discountAmount, req.user.id,
+        ]
+      );
+    } else {
+      inserted = await client.query(
+        `INSERT INTO installment_plans
+          (id, customer_id, product_id, principal_amount, purchase_cost, down_payment, number_of_installments,
+           installment_amount, frequency, start_date, status, interest_or_markup, markup_amount, outstanding_balance, discount_amount, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'active',$11,$12,$13,$14,$15)
+         RETURNING *`,
+        [
+          id, req.body.customerId, productId, req.body.principalAmount, purchaseCost, req.body.downPayment,
+          numberOfInstallments, req.body.installmentAmount, req.body.frequency, req.body.startDate,
+          interestRate, totalMarkup, outstandingBalance, discountAmount, req.user.id,
+        ]
+      );
+    }
 
     const today = todayDateOnly();
     const cutoff = new Date();

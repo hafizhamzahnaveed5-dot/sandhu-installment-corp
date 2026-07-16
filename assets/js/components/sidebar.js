@@ -20,7 +20,6 @@ const NAV_ITEMS = [
   {
     section: 'Business',
     items: [
-      { route: 'products',    label: 'Products',     icon: iconProducts() },
       { route: 'roznamcha',   label: 'Roznamcha',    icon: iconRoznamcha() },
       { route: 'reports',     label: 'Reports',      icon: iconReports() },
       { route: 'analytics',   label: 'Analytics',    icon: iconAnalytics() },

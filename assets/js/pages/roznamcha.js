@@ -306,7 +306,14 @@ function renderEntries(entries) {
             <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg-secondary)">
               <div>
                 <div style="font-weight:600">${entry.description}</div>
-                <div class="secondary" style="margin-top:4px">${entry.type === 'purchase' ? 'Purchase' : (entry.type === 'expense' ? 'Expense' : 'Payment')}${entry.referencePlanId ? ` · Plan ${entry.referencePlanId}` : ''}</div>
+                <div class="secondary" style="margin-top:4px">${entry.type === 'purchase' ? 'Purchase' : (entry.type === 'expense' ? 'Expense' : 'Payment')}${(() => {
+                  const planId = entry.planDisplayId || entry.referencePlanId;
+                  const custId = entry.customerAccountNumber;
+                  const bits = [];
+                  if (custId) bits.push(`Customer ${custId}`);
+                  if (planId) bits.push(`Plan ${planId}`);
+                  return bits.length ? ` · ${bits.join(' · ')}` : '';
+                })()}${entry.customerName ? ` · ${entry.customerName}` : ''}</div>
               </div>
               <div style="text-align:right">
                 <div class="badge ${entry.type === 'purchase' ? 'badge-info' : (entry.type === 'expense' ? 'badge-danger' : 'badge-success')}">${entry.type === 'purchase' ? 'Purchase' : (entry.type === 'expense' ? 'Expense' : 'Payment')}</div>

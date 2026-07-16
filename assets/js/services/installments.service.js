@@ -26,7 +26,7 @@ let mockPayments = [...MOCK_PAYMENTS];
 
 const InstallmentsService = {
   /** List installment plans, optionally filtered */
-  async listPlans({ customerId = '', status = '', page = 1, pageSize = Config.DEFAULT_PAGE_SIZE } = {}) {
+  async listPlans({ customerId = '', status = '', search = '', page = 1, pageSize = Config.DEFAULT_PAGE_SIZE } = {}) {
     if (Config.FEATURE_FLAGS.MOCK_MODE) {
       await delay();
       let data = [...mockPlans];
@@ -36,8 +36,18 @@ const InstallmentsService = {
       // Enrich with customer name for display
       data = data.map(p => {
         const customer = MOCK_CUSTOMERS.find(c => c.id === p.customerId);
-        return { ...p, customerName: customer?.fullName || 'Unknown' };
+        return { ...p, customerName: customer?.fullName || 'Unknown', customerAccountNumber: customer?.accountNumber || null };
       });
+
+      if (search) {
+        const q = search.toLowerCase();
+        data = data.filter(p =>
+          String(p.id || '').toLowerCase().includes(q) ||
+          String(p.customerName || '').toLowerCase().includes(q) ||
+          String(p.productName || '').toLowerCase().includes(q) ||
+          String(p.customerAccountNumber || '').toLowerCase().includes(q)
+        );
+      }
 
       const total = data.length;
       const items = data.slice((page - 1) * pageSize, page * pageSize);
@@ -48,7 +58,7 @@ const InstallmentsService = {
         pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
       };
     }
-    return api.get('/installment-plans', { customerId, status, page, pageSize });
+    return api.get('/installment-plans', { customerId, status, search, page, pageSize });
   },
 
   /** Get a single plan by ID */

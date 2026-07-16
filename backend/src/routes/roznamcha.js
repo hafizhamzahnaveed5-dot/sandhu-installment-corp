@@ -43,27 +43,42 @@ router.get('/', asyncHandler(async (req, res) => {
 
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const result = await pool.query(
-    `SELECT r.*, u.name AS created_by_name
+    `SELECT r.*, u.name AS created_by_name,
+            ip.id AS plan_id,
+            c.account_number AS customer_account_number,
+            c.full_name AS customer_name
      FROM roznamcha_entries r
      LEFT JOIN users u ON u.id = r.created_by
+     LEFT JOIN installment_plans ip ON ip.id = r.reference_plan_id
+     LEFT JOIN customers c ON c.id = ip.customer_id
      ${whereSql}
      ORDER BY r.entry_date DESC, r.created_at DESC, r.id DESC`,
     values
   );
 
-  return ok(res, result.rows.map((row) => ({
-    id: row.id,
-    entryDate: pgDateOnly(row.entry_date),
-    type: row.type,
-    description: row.description,
-    amount: Number(row.amount),
-    referencePlanId: row.reference_plan_id,
-    referencePaymentId: row.reference_payment_id,
-    createdBy: row.created_by,
-    createdByName: row.created_by_name,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  })));
+  return ok(res, result.rows.map((row) => {
+    const planId = row.plan_id || row.reference_plan_id || null;
+    const accountNumber = row.customer_account_number || null;
+    // Prefer account-based plan id; fall back to stored reference
+    const displayPlanId = planId || null;
+    const displayCustomerId = accountNumber || null;
+    return {
+      id: row.id,
+      entryDate: pgDateOnly(row.entry_date),
+      type: row.type,
+      description: row.description,
+      amount: Number(row.amount),
+      referencePlanId: row.reference_plan_id,
+      referencePaymentId: row.reference_payment_id,
+      planDisplayId: displayPlanId,
+      customerAccountNumber: displayCustomerId,
+      customerName: row.customer_name || null,
+      createdBy: row.created_by,
+      createdByName: row.created_by_name,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }));
 }));
 
 router.get('/summary', asyncHandler(async (req, res) => {
