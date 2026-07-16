@@ -46,6 +46,17 @@ const CustomersService = {
       }
       if (status) data = data.filter(c => c.status === status);
 
+      // Sort by Customer ID numeric suffix descending (e.g. Kashif-81 before Kashif-11)
+      data.sort((a, b) => {
+        const num = (v) => {
+          const m = String(v || '').match(/(\d+)$/);
+          return m ? Number(m[1]) : -1;
+        };
+        const diff = num(b.accountNumber) - num(a.accountNumber);
+        if (diff !== 0) return diff;
+        return String(b.accountNumber || '').localeCompare(String(a.accountNumber || ''));
+      });
+
       if (view === 'costs') {
         const totals = mockPlans.reduce((acc, plan) => {
           if (!acc[plan.customerId]) acc[plan.customerId] = { totalPurchaseCost: 0, totalCostGap: 0 };

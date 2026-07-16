@@ -52,7 +52,14 @@ router.get('/', asyncHandler(async (req, res) => {
            GROUP BY ip.customer_id
          ) pn ON pn.customer_id = c.id
          ${whereSql}
-         ORDER BY c.created_at DESC
+         ORDER BY
+           CASE
+             WHEN c.account_number ~ '(\d+)$'
+             THEN substring(c.account_number from '(\d+)$')::bigint
+             ELSE NULL
+           END DESC NULLS LAST,
+           c.account_number DESC NULLS LAST,
+           c.created_at DESC
          LIMIT $${values.length + 1} OFFSET $${values.length + 2}`
       : `SELECT c.*, COALESCE(pn.product_names, '') AS product_names
          FROM customers c
@@ -64,7 +71,14 @@ router.get('/', asyncHandler(async (req, res) => {
            GROUP BY ip.customer_id
          ) pn ON pn.customer_id = c.id
          ${whereSql}
-         ORDER BY c.created_at DESC
+         ORDER BY
+           CASE
+             WHEN c.account_number ~ '(\d+)$'
+             THEN substring(c.account_number from '(\d+)$')::bigint
+             ELSE NULL
+           END DESC NULLS LAST,
+           c.account_number DESC NULLS LAST,
+           c.created_at DESC
          LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
     [...values, pageSize, offset]
   );
