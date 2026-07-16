@@ -20,6 +20,10 @@ function applyBusiness(business = {}) {
   Config.BUSINESS.EMAIL = business.email || Config.BUSINESS.EMAIL;
   Config.BUSINESS.ADDRESS = business.address || Config.BUSINESS.ADDRESS;
   Config.BUSINESS.CURRENCY = business.currency || Config.BUSINESS.CURRENCY;
+
+  // Customer-panel floating button toggles (default ON)
+  Config.FEATURE_FLAGS.WHATSAPP_BUTTON = business.showWhatsappCustomer !== false;
+  Config.FEATURE_FLAGS.AI_ASSISTANT = business.showAiCustomer !== false;
 }
 
 function readLocalCache() {

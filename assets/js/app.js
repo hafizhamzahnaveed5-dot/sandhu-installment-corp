@@ -26,8 +26,10 @@ import SiteService from './services/site.service.js';
   document.documentElement.dataset.theme = saved;
 })();
 
-// Prefetch site settings (non-blocking)
-SiteService.load().catch(() => {});
+// Prefetch site settings (non-blocking), then refresh FABs for customer role
+SiteService.load().then(() => {
+  if (AuthService.isLoggedIn()) renderFloatingButtons();
+}).catch(() => {});
 
 // ── Route Map ─────────────────────────────────────────────────
 // DECISION: Each route is a lazy-loaded ES module.
@@ -185,18 +187,49 @@ function renderPageSkeleton() {
   `;
 }
 
-// ── Floating Buttons ──────────────────────────────────────────
+// ── Floating Buttons (customer panel only, draggable) ─────────
 function renderFloatingButtons() {
-  let fab = document.getElementById('fab-container');
-  if (fab) return;
+  const existing = document.getElementById('fab-container');
+  const existingPanel = document.getElementById('ai-panel');
+  const user = AuthService.getUser();
+  const isCustomer = user?.role === 'customer';
 
-  fab = document.createElement('div');
+  // Staff/admin: never show WhatsApp / AI FABs
+  if (!isCustomer) {
+    existing?.remove();
+    existingPanel?.remove();
+    return;
+  }
+
+  const showWhatsapp = Config.FEATURE_FLAGS.WHATSAPP_BUTTON !== false;
+  const showAi = Config.FEATURE_FLAGS.AI_ASSISTANT !== false;
+  if (!showWhatsapp && !showAi) {
+    existing?.remove();
+    existingPanel?.remove();
+    return;
+  }
+
+  // Rebuild so toggles take effect after settings change
+  existing?.remove();
+
+  const fab = document.createElement('div');
   fab.id = 'fab-container';
-  fab.className = 'fab-container';
+  fab.className = 'fab-container fab-draggable';
+  fab.title = 'Drag to move';
 
-  if (Config.FEATURE_FLAGS.WHATSAPP_BUTTON) {
+  const savedPos = (() => {
+    try { return JSON.parse(localStorage.getItem('sic_fab_pos') || 'null'); } catch { return null; }
+  })();
+  if (savedPos?.left != null && savedPos?.top != null) {
+    fab.style.left = `${savedPos.left}px`;
+    fab.style.top = `${savedPos.top}px`;
+    fab.style.right = 'auto';
+    fab.style.bottom = 'auto';
+  }
+
+  if (showWhatsapp) {
     const whatsapp = document.createElement('a');
-    whatsapp.href = `https://wa.me/${Config.BUSINESS.WHATSAPP_NUMBER}?text=Hello%20Sandhu%20Installment%20Corporation`;
+    whatsapp.href = `https://wa.me/${Config.BUSINESS.WHATSAPP_NUMBER}?text=${encodeURIComponent('Hello ' + (Config.BUSINESS.NAME || 'Sandhu Installment Corporation'))}`;
     whatsapp.target = '_blank';
     whatsapp.rel = 'noopener noreferrer';
     whatsapp.className = 'fab fab-whatsapp';
@@ -210,10 +243,11 @@ function renderFloatingButtons() {
     fab.appendChild(whatsapp);
   }
 
-  if (Config.FEATURE_FLAGS.AI_ASSISTANT) {
+  if (showAi) {
     const aiBtn = document.createElement('button');
     aiBtn.className = 'fab fab-ai';
     aiBtn.id = 'ai-fab';
+    aiBtn.type = 'button';
     aiBtn.setAttribute('aria-label', 'AI Assistant');
     aiBtn.innerHTML = `
       <span class="fab-label">AI Assistant</span>
@@ -221,12 +255,95 @@ function renderFloatingButtons() {
         <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
       </svg>
     `;
-    aiBtn.addEventListener('click', toggleAiPanel);
+    aiBtn.addEventListener('click', (e) => {
+      if (fab.dataset.dragging === '1') {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      toggleAiPanel();
+    });
     fab.appendChild(aiBtn);
   }
 
   document.body.appendChild(fab);
-  renderAiPanel();
+  makeFabDraggable(fab);
+
+  if (showAi && !document.getElementById('ai-panel')) {
+    renderAiPanel();
+  } else if (!showAi) {
+    existingPanel?.remove();
+  }
+}
+
+function makeFabDraggable(fab) {
+  let startX = 0;
+  let startY = 0;
+  let origLeft = 0;
+  let origTop = 0;
+  let moved = false;
+
+  const onPointerDown = (e) => {
+    // Don't start drag from middle of a click on links unless holding a bit
+    if (e.button != null && e.button !== 0) return;
+    const point = e.touches ? e.touches[0] : e;
+    const rect = fab.getBoundingClientRect();
+    startX = point.clientX;
+    startY = point.clientY;
+    origLeft = rect.left;
+    origTop = rect.top;
+    moved = false;
+    fab.dataset.dragging = '0';
+    fab.style.left = `${origLeft}px`;
+    fab.style.top = `${origTop}px`;
+    fab.style.right = 'auto';
+    fab.style.bottom = 'auto';
+    fab.classList.add('is-dragging');
+
+    const onMove = (ev) => {
+      const p = ev.touches ? ev.touches[0] : ev;
+      const dx = p.clientX - startX;
+      const dy = p.clientY - startY;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+        moved = true;
+        fab.dataset.dragging = '1';
+      }
+      const maxLeft = window.innerWidth - fab.offsetWidth - 8;
+      const maxTop = window.innerHeight - fab.offsetHeight - 8;
+      const left = Math.max(8, Math.min(maxLeft, origLeft + dx));
+      const top = Math.max(8, Math.min(maxTop, origTop + dy));
+      fab.style.left = `${left}px`;
+      fab.style.top = `${top}px`;
+      if (ev.cancelable) ev.preventDefault();
+    };
+
+    const onUp = (ev) => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onUp);
+      fab.classList.remove('is-dragging');
+      if (moved) {
+        const left = parseFloat(fab.style.left) || 8;
+        const top = parseFloat(fab.style.top) || 8;
+        localStorage.setItem('sic_fab_pos', JSON.stringify({ left, top }));
+        // Prevent click-through after drag
+        if (ev.target?.closest?.('a.fab-whatsapp')) {
+          ev.preventDefault?.();
+        }
+        setTimeout(() => { fab.dataset.dragging = '0'; }, 50);
+      } else {
+        fab.dataset.dragging = '0';
+      }
+    };
+
+    document.addEventListener('pointermove', onMove, { passive: false });
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend', onUp);
+  };
+
+  fab.addEventListener('pointerdown', onPointerDown);
 }
 
 function renderAiPanel() {

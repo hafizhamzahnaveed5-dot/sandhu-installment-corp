@@ -80,6 +80,7 @@ export default async function init() {
             <tr>
               <th>Customer ID</th>
               <th>Customer</th>
+              <th class="hide-mobile">Products</th>
               <th>Phone</th>
               <th class="hide-mobile">City</th>
               <th class="hide-mobile">Outstanding</th>
@@ -90,7 +91,7 @@ export default async function init() {
             </tr>
           </thead>
           <tbody id="customers-tbody">
-            ${renderTableSkeleton(7, state.view === 'costs' ? 10 : 8)}
+            ${renderTableSkeleton(7, state.view === 'costs' ? 11 : 9)}
           </tbody>
         </table>
       </div>
@@ -159,7 +160,7 @@ function renderTable(customers) {
 
   if (customers.length === 0) {
     tbody.innerHTML = `
-      <tr><td colspan="${state.view === 'costs' ? 10 : 8}">
+      <tr><td colspan="${state.view === 'costs' ? 11 : 9}">
         <div class="empty-state">
           <span style="font-size:40px">👥</span>
           <h3>No customers found</h3>
@@ -185,6 +186,11 @@ function renderTable(customers) {
             <div style="font-size:12px;color:var(--color-text-tertiary)">${escapeHtml(c.email || '')}</div>
           </div>
         </div>
+      </td>
+      <td class="hide-mobile">
+        ${c.productNames
+          ? `<span style="font-size:13px;color:var(--color-text-primary)">${escapeHtml(c.productNames)}</span>`
+          : `<span style="font-size:12px;color:var(--color-text-tertiary)">—</span>`}
       </td>
       <td class="mono secondary">${escapeHtml(c.phone || '')}</td>
       <td class="hide-mobile secondary">${escapeHtml(c.city || '')}</td>
@@ -256,11 +262,11 @@ function exportCsv() {
     if (!result.success) return;
     const rows = [
       state.view === 'costs'
-        ? ['Customer ID', 'Full Name', 'Phone', 'Email', 'City', 'Status', 'Outstanding', 'Purchase Cost', 'Cost Gap', 'Joined']
-        : ['Customer ID', 'Full Name', 'Phone', 'Email', 'City', 'Status', 'Outstanding', 'Joined'],
+        ? ['Customer ID', 'Full Name', 'Products', 'Phone', 'Email', 'City', 'Status', 'Outstanding', 'Purchase Cost', 'Cost Gap', 'Joined']
+        : ['Customer ID', 'Full Name', 'Products', 'Phone', 'Email', 'City', 'Status', 'Outstanding', 'Joined'],
       ...result.data.map(c => state.view === 'costs'
-        ? [c.accountNumber || '', c.fullName, c.phone, c.email, c.city, c.status, c.totalOutstanding, c.totalPurchaseCost, c.totalCostGap, formatDate(c.createdAt)]
-        : [c.accountNumber || '', c.fullName, c.phone, c.email, c.city, c.status, c.totalOutstanding, formatDate(c.createdAt)]
+        ? [c.accountNumber || '', c.fullName, c.productNames || '', c.phone, c.email, c.city, c.status, c.totalOutstanding, c.totalPurchaseCost, c.totalCostGap, formatDate(c.createdAt)]
+        : [c.accountNumber || '', c.fullName, c.productNames || '', c.phone, c.email, c.city, c.status, c.totalOutstanding, formatDate(c.createdAt)]
       ),
     ];
     const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');

@@ -22,6 +22,7 @@ export function mapCustomer(row) {
     totalCostGap: Number(row.total_cost_gap || 0),
     smsAlertsEnabled: row.sms_alerts_enabled ?? true,
     notes: row.notes,
+    productNames: row.product_names || '',
   };
 }
 

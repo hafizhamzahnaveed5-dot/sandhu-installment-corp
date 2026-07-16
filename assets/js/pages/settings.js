@@ -80,6 +80,23 @@ export default async function init() {
         </div>
         <button class="btn btn-secondary" id="save-theme-btn">Save Theme</button>
         <hr style="border:none;border-top:1px solid var(--color-border);margin:24px 0">
+        <div class="card-header" style="padding:0;margin-bottom:12px"><h4 style="margin:0">Customer Panel Buttons</h4></div>
+        <p class="secondary" style="font-size:13px;margin-bottom:12px">WhatsApp &amp; AI float only for customers — never on admin/staff screens.</p>
+        <label class="checkbox-group" style="margin-bottom:12px;min-height:auto">
+          <input type="checkbox" id="set-show-whatsapp" ${biz.showWhatsappCustomer !== false ? 'checked' : ''} ${isAdmin ? '' : 'disabled'}>
+          <span>
+            <span style="display:block;font-size:14px;font-weight:500;color:var(--color-text-primary)">Show WhatsApp button</span>
+            <span style="display:block;font-size:12px;color:var(--color-text-tertiary)">Customer dashboard only · draggable</span>
+          </span>
+        </label>
+        <label class="checkbox-group" style="margin-bottom:16px;min-height:auto">
+          <input type="checkbox" id="set-show-ai" ${biz.showAiCustomer !== false ? 'checked' : ''} ${isAdmin ? '' : 'disabled'}>
+          <span>
+            <span style="display:block;font-size:14px;font-weight:500;color:var(--color-text-primary)">Show AI Assistant button</span>
+            <span style="display:block;font-size:12px;color:var(--color-text-tertiary)">Customer dashboard only · draggable</span>
+          </span>
+        </label>
+        ${isAdmin ? `<button class="btn btn-secondary btn-sm" id="save-fab-toggles-btn" style="margin-bottom:16px">Save Button Toggles</button>` : ''}
         <div class="info-row"><span class="info-label">API</span><span class="info-value" style="font-size:12px;word-break:break-all">${Config.API_BASE_URL}</span></div>
         <div class="info-row"><span class="info-label">Mode</span><span class="info-value">${Config.FEATURE_FLAGS.MOCK_MODE ? 'Mock' : 'Live'}</span></div>
         ${isAdmin ? `
@@ -111,11 +128,34 @@ export default async function init() {
       email: document.getElementById('set-email').value.trim(),
       address: document.getElementById('set-address').value.trim(),
       currency: document.getElementById('set-currency').value.trim() || 'PKR',
+      showWhatsappCustomer: document.getElementById('set-show-whatsapp')?.checked !== false,
+      showAiCustomer: document.getElementById('set-show-ai')?.checked !== false,
     };
     const res = await SiteService.save('business', payload);
     btn.classList.remove('loading');
     if (res.success) Toast.success('Saved', 'Business settings updated for the whole site.');
     else Toast.error('Save failed', res.error || 'Could not save settings. Run migration 012 if this is a new feature.');
+  });
+
+  document.getElementById('save-fab-toggles-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('save-fab-toggles-btn');
+    btn.classList.add('loading');
+    const current = { ...(settings.business || {}), ...biz };
+    const payload = {
+      name: current.name || current.NAME || Config.BUSINESS.NAME,
+      tagline: current.tagline || Config.BUSINESS.TAGLINE,
+      phone: current.phone || Config.BUSINESS.PHONE,
+      whatsapp: (current.whatsapp || Config.BUSINESS.WHATSAPP_NUMBER || '').toString().replace(/[^\d]/g, ''),
+      email: current.email || Config.BUSINESS.EMAIL,
+      address: current.address || Config.BUSINESS.ADDRESS,
+      currency: current.currency || Config.BUSINESS.CURRENCY,
+      showWhatsappCustomer: document.getElementById('set-show-whatsapp')?.checked !== false,
+      showAiCustomer: document.getElementById('set-show-ai')?.checked !== false,
+    };
+    const res = await SiteService.save('business', payload);
+    btn.classList.remove('loading');
+    if (res.success) Toast.success('Saved', 'Customer panel button toggles updated.');
+    else Toast.error('Save failed', res.error || 'Could not save toggles.');
   });
 }
 

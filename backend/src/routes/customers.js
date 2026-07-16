@@ -35,7 +35,8 @@ router.get('/', asyncHandler(async (req, res) => {
 
   const rows = await pool.query(
     viewCosts
-      ? `SELECT c.*, COALESCE(tc.total_purchase_cost, 0)::numeric AS total_purchase_cost, COALESCE(tc.total_cost_gap, 0)::numeric AS total_cost_gap
+      ? `SELECT c.*, COALESCE(tc.total_purchase_cost, 0)::numeric AS total_purchase_cost, COALESCE(tc.total_cost_gap, 0)::numeric AS total_cost_gap,
+            COALESCE(pn.product_names, '') AS product_names
          FROM customers c
          LEFT JOIN (
            SELECT customer_id, SUM(purchase_cost)::numeric AS total_purchase_cost,
@@ -43,10 +44,28 @@ router.get('/', asyncHandler(async (req, res) => {
            FROM installment_plans
            GROUP BY customer_id
          ) tc ON tc.customer_id = c.id
+         LEFT JOIN (
+           SELECT ip.customer_id,
+                  string_agg(DISTINCT COALESCE(pr.name, 'Custom Plan'), ', ' ORDER BY COALESCE(pr.name, 'Custom Plan')) AS product_names
+           FROM installment_plans ip
+           LEFT JOIN products pr ON pr.id = ip.product_id
+           GROUP BY ip.customer_id
+         ) pn ON pn.customer_id = c.id
          ${whereSql}
          ORDER BY c.created_at DESC
          LIMIT $${values.length + 1} OFFSET $${values.length + 2}`
-      : `SELECT c.* FROM customers c ${whereSql} ORDER BY c.created_at DESC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
+      : `SELECT c.*, COALESCE(pn.product_names, '') AS product_names
+         FROM customers c
+         LEFT JOIN (
+           SELECT ip.customer_id,
+                  string_agg(DISTINCT COALESCE(pr.name, 'Custom Plan'), ', ' ORDER BY COALESCE(pr.name, 'Custom Plan')) AS product_names
+           FROM installment_plans ip
+           LEFT JOIN products pr ON pr.id = ip.product_id
+           GROUP BY ip.customer_id
+         ) pn ON pn.customer_id = c.id
+         ${whereSql}
+         ORDER BY c.created_at DESC
+         LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
     [...values, pageSize, offset]
   );
 
