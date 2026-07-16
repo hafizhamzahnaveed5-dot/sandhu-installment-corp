@@ -38,23 +38,24 @@ export default async function init() {
   await loadProducts({ page: 1 });
 }
 
-async function loadProducts({ categoryId = state.selectedCategory, search = state.searchQuery, page = state.page } = {}) {
+async function loadProducts({ categoryId = state.selectedCategory, search = state.searchQuery } = {}) {
   state.selectedCategory = categoryId || '';
   state.searchQuery = search;
-  state.page = page;
+  state.page = 1;
+  state.pageSize = Config.DEFAULT_PAGE_SIZE;
 
   try {
     const result = await ProductsService.list({
       categoryId: categoryId || null,
       search: state.searchQuery,
-      page: state.page,
+      page: 1,
       pageSize: state.pageSize,
     });
 
     if (result.success) {
       state.products = result.data;
-      state.total = result.pagination?.total || 0;
-      state.totalPages = result.pagination?.totalPages || 1;
+      state.total = result.pagination?.total || result.data?.length || 0;
+      state.totalPages = 1;
     } else {
       state.products = [];
       state.total = 0;
@@ -81,7 +82,7 @@ function renderPage() {
     <div class="page-header">
       <div class="page-header-left">
         <h1>Product Catalog</h1>
-        <p>Showing ${products.length} of ${state.total} products</p>
+        <p>${state.total} product${state.total !== 1 ? 's' : ''} total</p>
       </div>
       <div class="page-header-actions">
         ${canEdit ? `<button class="btn btn-secondary" id="manage-cats-btn">Manage Categories</button>
@@ -143,19 +144,18 @@ function renderPage() {
 
     <div class="pagination-container" style="margin-top:24px;display:flex;justify-content:space-between;align-items:center">
       <div id="pagination-info" class="text-secondary"></div>
-      <div class="pagination" id="pagination"></div>
     </div>
   `;
 
   // Search input
   document.getElementById('prod-search').addEventListener('input', e => {
-    loadProducts({ search: e.target.value, page: 1 });
+    loadProducts({ search: e.target.value });
   });
 
   // Category filter click
   document.querySelectorAll('.filter-chip[data-cat]').forEach(btn => {
     btn.addEventListener('click', () => {
-      loadProducts({ categoryId: btn.dataset.cat || null, search: state.searchQuery, page: 1 });
+      loadProducts({ categoryId: btn.dataset.cat || null, search: state.searchQuery });
     });
   });
 
@@ -183,53 +183,10 @@ function renderPage() {
 
 function renderPagination() {
   const info = document.getElementById('pagination-info');
-  const pag = document.getElementById('pagination');
-  if (!info || !pag) return;
-
-  const start = state.total === 0 ? 0 : (state.page - 1) * state.pageSize + 1;
-  const end = Math.min(state.page * state.pageSize, state.total);
-  info.textContent = state.total === 0 ? 'No products found' : `Showing ${start}–${end} of ${state.total}`;
-
-  if (state.totalPages <= 1) {
-    pag.innerHTML = '';
-    return;
-  }
-
-  const pages = [];
-  for (let i = 1; i <= state.totalPages; i++) {
-    if (i === 1 || i === state.totalPages || (i >= state.page - 1 && i <= state.page + 1)) {
-      pages.push(i);
-    } else if (pages[pages.length - 1] !== '...') {
-      pages.push('...');
-    }
-  }
-
-  pag.innerHTML = `
-    <button class="page-btn" id="prev-btn" ${state.page <= 1 ? 'disabled' : ''}>Prev</button>
-    ${pages.map(p => typeof p === 'number'
-      ? `<button class="page-btn ${p === state.page ? 'active' : ''}" data-page="${p}">${p}</button>`
-      : `<span class="page-separator">${p}</span>`
-    ).join('')}
-    <button class="page-btn" id="next-btn" ${state.page >= state.totalPages ? 'disabled' : ''}>Next</button>
-  `;
-
-  pag.querySelectorAll('.page-btn[data-page]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      loadProducts({ categoryId: state.selectedCategory || null, search: state.searchQuery, page: Number(btn.dataset.page) });
-    });
-  });
-
-  pag.querySelector('#prev-btn')?.addEventListener('click', () => {
-    if (state.page > 1) {
-      loadProducts({ categoryId: state.selectedCategory || null, search: state.searchQuery, page: state.page - 1 });
-    }
-  });
-
-  pag.querySelector('#next-btn')?.addEventListener('click', () => {
-    if (state.page < state.totalPages) {
-      loadProducts({ categoryId: state.selectedCategory || null, search: state.searchQuery, page: state.page + 1 });
-    }
-  });
+  if (!info) return;
+  info.textContent = state.total === 0
+    ? 'No products found'
+    : `Showing all ${state.total} product${state.total !== 1 ? 's' : ''}`;
 }
 
 function showProductModal(product = null) {

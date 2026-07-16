@@ -234,7 +234,7 @@ const InstallmentsService = {
   },
 
   /** List payments with optional filters */
-  async listPayments({ planId = '', dateFrom = '', dateTo = '', pageSize = 500, includeReversed = true } = {}) {
+  async listPayments({ planId = '', dateFrom = '', dateTo = '', pageSize = Config.DEFAULT_PAGE_SIZE, includeReversed = true } = {}) {
     if (Config.FEATURE_FLAGS.MOCK_MODE) {
       await delay();
       let data = [...mockPayments];

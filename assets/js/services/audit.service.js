@@ -47,7 +47,7 @@ const AuditService = {
   },
 
   /** List audit logs (admin only) */
-  async list({ page = 1, pageSize = 30 } = {}) {
+  async list({ page = 1, pageSize = Config.DEFAULT_PAGE_SIZE } = {}) {
     if (Config.FEATURE_FLAGS.MOCK_MODE) {
       const sorted = [...mockLogs].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
       const items = sorted.slice((page - 1) * pageSize, page * pageSize);

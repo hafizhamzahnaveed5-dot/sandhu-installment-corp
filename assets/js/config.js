@@ -51,8 +51,8 @@ export const Config = {
     CURRENCY_LOCALE: 'en-PK',
   },
 
-  // ── Pagination ─────────────────────────────────────────────
-  DEFAULT_PAGE_SIZE: 15,
+  // ── List size (single-page lists — no paging UI) ────────────
+  DEFAULT_PAGE_SIZE: 10000,
 
   // ── Auth ───────────────────────────────────────────────────
   // DECISION: In mock mode, tokens live in sessionStorage (cleared on tab close).
@@ -83,18 +83,24 @@ export function formatCurrency(amount, compact = false) {
   }).format(amount);
 }
 
-/** Format a date string to a readable date (avoids UTC day-shift for YYYY-MM-DD). */
+/** Format a date as dd-mm-yyyy (avoids UTC day-shift for YYYY-MM-DD). */
 export function formatDate(dateStr) {
   if (!dateStr) return '—';
   const raw = String(dateStr).trim();
   const dateOnly = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  const date = dateOnly
-    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
-    : new Date(raw);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleDateString('en-PK', {
-    year: 'numeric', month: 'short', day: 'numeric',
-  });
+  let day; let month; let year;
+  if (dateOnly) {
+    year = dateOnly[1];
+    month = dateOnly[2];
+    day = dateOnly[3];
+  } else {
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) return '—';
+    day = String(date.getDate()).padStart(2, '0');
+    month = String(date.getMonth() + 1).padStart(2, '0');
+    year = String(date.getFullYear());
+  }
+  return `${day}-${month}-${year}`;
 }
 
 /** Format a date as relative time ("3 days ago", "in 2 days") */

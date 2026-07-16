@@ -47,9 +47,10 @@ export default async function init({ param }) {
 
   const installmentNo = p.installmentNumber || (p.isEarlySettlement ? 'Settlement' : '—');
   const receivedBy = p.receivedByName || AuthService.getUser()?.name || 'Sandhu IC Staff';
-  const printDate = new Date().toLocaleDateString('en-PK', {
-    year: 'numeric', month: 'long', day: 'numeric',
-  });
+  const printDate = (() => {
+    const n = new Date();
+    return `${String(n.getDate()).padStart(2, '0')}-${String(n.getMonth() + 1).padStart(2, '0')}-${n.getFullYear()}`;
+  })();
 
   content.innerHTML = `
     <div class="breadcrumb no-print" style="margin-bottom:var(--space-5)">

@@ -94,10 +94,9 @@ export default async function init() {
           </tbody>
         </table>
       </div>
-      <!-- Pagination -->
+      <!-- List footer -->
       <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-top:1px solid var(--color-border)">
         <div style="font-size:13px;color:var(--color-text-tertiary)" id="pagination-info">Loading...</div>
-        <div class="pagination" id="pagination"></div>
       </div>
     </div>
   `;
@@ -133,7 +132,7 @@ async function loadCustomers() {
   const result = await CustomersService.list({
     search: state.search,
     status: state.status,
-    page: state.page,
+    page: 1,
     pageSize: Config.DEFAULT_PAGE_SIZE,
     view: state.view,
   });
@@ -143,8 +142,9 @@ async function loadCustomers() {
     return;
   }
 
-  state.total = result.pagination.total;
-  state.totalPages = result.pagination.totalPages;
+  state.total = result.pagination?.total ?? result.data?.length ?? 0;
+  state.totalPages = 1;
+  state.page = 1;
 
   document.getElementById('customer-count').textContent =
     `${state.total} customer${state.total !== 1 ? 's' : ''}${state.search ? ' matching "' + state.search + '"' : ''}${state.view === 'costs' ? ' — purchase cost summary' : ''}`;
@@ -235,42 +235,10 @@ function renderTable(customers) {
 
 function renderPagination() {
   const info = document.getElementById('pagination-info');
-  const pag = document.getElementById('pagination');
-  if (!info || !pag) return;
-
-  const start = (state.page - 1) * Config.DEFAULT_PAGE_SIZE + 1;
-  const end   = Math.min(state.page * Config.DEFAULT_PAGE_SIZE, state.total);
-  info.textContent = state.total > 0 ? `Showing ${start}–${end} of ${state.total}` : 'No results';
-
-  if (state.totalPages <= 1) { pag.innerHTML = ''; return; }
-
-  const pages = [];
-  for (let i = 1; i <= state.totalPages; i++) {
-    if (i === 1 || i === state.totalPages || (i >= state.page - 1 && i <= state.page + 1)) {
-      pages.push(i);
-    } else if (pages[pages.length - 1] !== '...') {
-      pages.push('...');
-    }
-  }
-
-  pag.innerHTML = `
-    <button class="page-btn" id="prev-btn" ${state.page <= 1 ? 'disabled' : ''}>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-    </button>
-    ${pages.map(p => typeof p === 'number'
-      ? `<button class="page-btn ${p === state.page ? 'active' : ''}" data-page="${p}">${p}</button>`
-      : `<span style="padding:0 6px;color:var(--color-text-tertiary)">…</span>`
-    ).join('')}
-    <button class="page-btn" id="next-btn" ${state.page >= state.totalPages ? 'disabled' : ''}>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-    </button>
-  `;
-
-  pag.querySelector('#prev-btn')?.addEventListener('click', async () => { state.page--; await loadCustomers(); });
-  pag.querySelector('#next-btn')?.addEventListener('click', async () => { state.page++; await loadCustomers(); });
-  pag.querySelectorAll('[data-page]').forEach(btn => {
-    btn.addEventListener('click', async () => { state.page = parseInt(btn.dataset.page); await loadCustomers(); });
-  });
+  if (!info) return;
+  info.textContent = state.total > 0
+    ? `Showing all ${state.total} customer${state.total !== 1 ? 's' : ''}`
+    : 'No results';
 }
 
 function showAddCustomerModal() {
@@ -291,8 +259,8 @@ function exportCsv() {
         ? ['Customer ID', 'Full Name', 'Phone', 'Email', 'City', 'Status', 'Outstanding', 'Purchase Cost', 'Cost Gap', 'Joined']
         : ['Customer ID', 'Full Name', 'Phone', 'Email', 'City', 'Status', 'Outstanding', 'Joined'],
       ...result.data.map(c => state.view === 'costs'
-        ? [c.accountNumber || '', c.fullName, c.phone, c.email, c.city, c.status, c.totalOutstanding, c.totalPurchaseCost, c.totalCostGap, new Date(c.createdAt).toLocaleDateString()]
-        : [c.accountNumber || '', c.fullName, c.phone, c.email, c.city, c.status, c.totalOutstanding, new Date(c.createdAt).toLocaleDateString()]
+        ? [c.accountNumber || '', c.fullName, c.phone, c.email, c.city, c.status, c.totalOutstanding, c.totalPurchaseCost, c.totalCostGap, formatDate(c.createdAt)]
+        : [c.accountNumber || '', c.fullName, c.phone, c.email, c.city, c.status, c.totalOutstanding, formatDate(c.createdAt)]
       ),
     ];
     const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');

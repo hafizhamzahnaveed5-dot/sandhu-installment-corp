@@ -14,7 +14,7 @@ export function asyncHandler(fn) {
 
 export function paginationParams(req) {
   const page = Math.max(Number(req.query.page || 1), 1);
-  const pageSize = Math.min(Math.max(Number(req.query.pageSize || 15), 1), 1000);
+  const pageSize = Math.min(Math.max(Number(req.query.pageSize || 10000), 1), 10000);
   return { page, pageSize, offset: (page - 1) * pageSize };
 }
 
