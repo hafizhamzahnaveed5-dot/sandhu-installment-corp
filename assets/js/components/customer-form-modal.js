@@ -18,6 +18,7 @@ function fieldValue(customer, key) {
 function getPayload(modal) {
   return {
     fullName:       modal.backdrop.querySelector('#c-fullName').value.trim(),
+    fatherName:     modal.backdrop.querySelector('#c-fatherName').value.trim(),
     accountNumber:  modal.backdrop.querySelector('#c-accountNumber').value.trim(),
     phone:          modal.backdrop.querySelector('#c-phone').value.trim(),
     city:           modal.backdrop.querySelector('#c-city').value.trim(),
@@ -41,11 +42,16 @@ export function openCustomerFormModal({ mode = 'add', customer = null, onSaved =
     <div class="form-grid">
       <div class="form-group">
         <label class="form-label">Full Name <span class="required">*</span></label>
-        <input type="text" id="c-fullName" class="form-control" placeholder="Muhammad Ali Khan" value="${fieldValue(customer, 'fullName')}" required/>
+        <input type="text" id="c-fullName" class="form-control" placeholder="Sabir Hussain" value="${fieldValue(customer, 'fullName')}" required/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Father Name</label>
+        <input type="text" id="c-fatherName" class="form-control" placeholder="Mansha Khan" value="${fieldValue(customer, 'fatherName')}"/>
+        <span class="form-help">Will show as S/O on the customer list.</span>
       </div>
       <div class="form-group">
         <label class="form-label">Customer ID / Account No. <span class="required">*</span></label>
-        <input type="text" id="c-accountNumber" class="form-control" placeholder="Your manual ledger ID e.g. 1042" value="${fieldValue(customer, 'accountNumber')}" required/>
+        <input type="text" id="c-accountNumber" class="form-control" placeholder="Your manual ledger ID e.g. Kashif-82" value="${fieldValue(customer, 'accountNumber')}" required/>
         <span class="form-help">Enter your existing manual system customer ID. Do not leave blank.</span>
       </div>
       <div class="form-group">

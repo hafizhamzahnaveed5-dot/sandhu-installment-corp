@@ -193,7 +193,9 @@ function renderTable(customers) {
           <div class="avatar avatar-sm">${getInitials(c.fullName)}</div>
           <div>
             <div style="font-weight:500">${escapeHtml(c.fullName)}</div>
-            <div style="font-size:12px;color:var(--color-text-tertiary)">${escapeHtml(c.email || '')}</div>
+            ${c.fatherName
+              ? `<div style="font-size:12px;color:var(--color-text-secondary)">S/O ${escapeHtml(c.fatherName)}</div>`
+              : (c.email ? `<div style="font-size:12px;color:var(--color-text-tertiary)">${escapeHtml(c.email)}</div>` : '')}
           </div>
         </div>
       </td>

@@ -23,7 +23,7 @@ router.get('/', asyncHandler(async (req, res) => {
   }
   if (req.query.search) {
     values.push(`%${req.query.search}%`);
-    where.push(`(c.full_name ILIKE $${values.length} OR c.phone ILIKE $${values.length} OR c.city ILIKE $${values.length} OR c.account_number ILIKE $${values.length})`);
+    where.push(`(c.full_name ILIKE $${values.length} OR COALESCE(c.father_name, '') ILIKE $${values.length} OR c.phone ILIKE $${values.length} OR c.city ILIKE $${values.length} OR c.account_number ILIKE $${values.length})`);
   }
   if (req.query.status) {
     values.push(req.query.status);
@@ -120,6 +120,7 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
   const customer = {
     id: newId('cust'),
     fullName,
+    fatherName: req.body.fatherName ? String(req.body.fatherName).trim() : null,
     accountNumber: String(accountNumber).trim(),
     cnicOrId: req.body.cnicOrId || null,
     phone,
@@ -144,17 +145,33 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
   }
 
   const row = await withTransaction(async (client) => {
-    const inserted = await client.query(
-      `INSERT INTO customers
-       (id, full_name, account_number, cnic_or_id, phone, email, address, city, status, guarantor_name, guarantor_phone, documents, credit_score, total_outstanding, sms_alerts_enabled, notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
-       RETURNING *`,
-      [
-        customer.id, customer.fullName, customer.accountNumber, customer.cnicOrId, customer.phone, customer.email, customer.address,
-        customer.city, customer.status, customer.guarantorName, customer.guarantorPhone,
-        JSON.stringify(customer.documents), customer.creditScore, customer.totalOutstanding, customer.smsAlertsEnabled, customer.notes,
-      ]
+    const hasFather = await client.query(
+      `SELECT 1 FROM information_schema.columns
+       WHERE table_name = 'customers' AND column_name = 'father_name' LIMIT 1`
     );
+    const inserted = hasFather.rowCount
+      ? await client.query(
+          `INSERT INTO customers
+           (id, full_name, father_name, account_number, cnic_or_id, phone, email, address, city, status, guarantor_name, guarantor_phone, documents, credit_score, total_outstanding, sms_alerts_enabled, notes)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+           RETURNING *`,
+          [
+            customer.id, customer.fullName, customer.fatherName, customer.accountNumber, customer.cnicOrId, customer.phone, customer.email, customer.address,
+            customer.city, customer.status, customer.guarantorName, customer.guarantorPhone,
+            JSON.stringify(customer.documents), customer.creditScore, customer.totalOutstanding, customer.smsAlertsEnabled, customer.notes,
+          ]
+        )
+      : await client.query(
+          `INSERT INTO customers
+           (id, full_name, account_number, cnic_or_id, phone, email, address, city, status, guarantor_name, guarantor_phone, documents, credit_score, total_outstanding, sms_alerts_enabled, notes)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+           RETURNING *`,
+          [
+            customer.id, customer.fullName, customer.accountNumber, customer.cnicOrId, customer.phone, customer.email, customer.address,
+            customer.city, customer.status, customer.guarantorName, customer.guarantorPhone,
+            JSON.stringify(customer.documents), customer.creditScore, customer.totalOutstanding, customer.smsAlertsEnabled, customer.notes,
+          ]
+        );
     await writeAudit(client, req.user.id, 'CREATE', 'Customer', customer.id, `Created customer: ${customer.fullName}`);
     return inserted.rows[0];
   });
@@ -181,19 +198,38 @@ router.put('/:id', requireMinRole('manager'), asyncHandler(async (req, res) => {
   }
 
   const row = await withTransaction(async (client) => {
-    const updated = await client.query(
-      `UPDATE customers SET
-        full_name=$2, account_number=$3, cnic_or_id=$4, phone=$5, email=$6, address=$7, city=$8, status=$9,
-        guarantor_name=$10, guarantor_phone=$11, documents=$12, credit_score=$13,
-        total_outstanding=$14, sms_alerts_enabled=$15, notes=$16, updated_at=now()
-       WHERE id=$1 RETURNING *`,
-      [
-        req.params.id, source.fullName, accountNumber, source.cnicOrId, source.phone, source.email, source.address,
-        source.city, source.status, source.guarantorName, source.guarantorPhone,
-        JSON.stringify(source.documents || []), source.creditScore || 0, source.totalOutstanding || 0,
-        source.smsAlertsEnabled ?? true, source.notes,
-      ]
+    const hasFather = await client.query(
+      `SELECT 1 FROM information_schema.columns
+       WHERE table_name = 'customers' AND column_name = 'father_name' LIMIT 1`
     );
+    const fatherName = source.fatherName ? String(source.fatherName).trim() : null;
+    const updated = hasFather.rowCount
+      ? await client.query(
+          `UPDATE customers SET
+            full_name=$2, father_name=$3, account_number=$4, cnic_or_id=$5, phone=$6, email=$7, address=$8, city=$9, status=$10,
+            guarantor_name=$11, guarantor_phone=$12, documents=$13, credit_score=$14,
+            total_outstanding=$15, sms_alerts_enabled=$16, notes=$17, updated_at=now()
+           WHERE id=$1 RETURNING *`,
+          [
+            req.params.id, source.fullName, fatherName, accountNumber, source.cnicOrId, source.phone, source.email, source.address,
+            source.city, source.status, source.guarantorName, source.guarantorPhone,
+            JSON.stringify(source.documents || []), source.creditScore || 0, source.totalOutstanding || 0,
+            source.smsAlertsEnabled ?? true, source.notes,
+          ]
+        )
+      : await client.query(
+          `UPDATE customers SET
+            full_name=$2, account_number=$3, cnic_or_id=$4, phone=$5, email=$6, address=$7, city=$8, status=$9,
+            guarantor_name=$10, guarantor_phone=$11, documents=$12, credit_score=$13,
+            total_outstanding=$14, sms_alerts_enabled=$15, notes=$16, updated_at=now()
+           WHERE id=$1 RETURNING *`,
+          [
+            req.params.id, source.fullName, accountNumber, source.cnicOrId, source.phone, source.email, source.address,
+            source.city, source.status, source.guarantorName, source.guarantorPhone,
+            JSON.stringify(source.documents || []), source.creditScore || 0, source.totalOutstanding || 0,
+            source.smsAlertsEnabled ?? true, source.notes,
+          ]
+        );
     await writeAudit(client, req.user.id, 'UPDATE', 'Customer', req.params.id, `Updated customer: ${source.fullName}`);
     return updated.rows[0];
   });

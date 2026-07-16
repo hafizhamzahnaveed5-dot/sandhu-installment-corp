@@ -137,6 +137,7 @@ export default async function init({ param }) {
           <h4 style="margin-bottom:16px">Contact Information</h4>
           <div class="info-row"><span class="info-label">Customer ID</span><span class="info-value mono" style="font-weight:700;color:var(--color-accent-blue)">${c.accountNumber || '—'}</span></div>
           <div class="info-row"><span class="info-label">Full Name</span><span class="info-value">${c.fullName}</span></div>
+          <div class="info-row"><span class="info-label">Father Name</span><span class="info-value">${c.fatherName || '—'}</span></div>
           <div class="info-row"><span class="info-label">Phone</span><span class="info-value mono">${c.phone}</span></div>
           <div class="info-row"><span class="info-label">SMS Alerts</span><span class="info-value"><span class="badge ${c.smsAlertsEnabled === false ? 'badge-inactive' : 'badge-paid'} badge-nodot">${c.smsAlertsEnabled === false ? 'Disabled' : 'Enabled'}</span></span></div>
           <div class="info-row"><span class="info-label">Email</span><span class="info-value">${c.email || '—'}</span></div>

@@ -5,6 +5,7 @@ export function mapCustomer(row) {
   return {
     id: row.id,
     fullName: row.full_name,
+    fatherName: row.father_name || null,
     accountNumber: row.account_number || null,
     cnicOrId: row.cnic_or_id,
     phone: row.phone,
