@@ -35,6 +35,17 @@ function toDateInputValue(value) {
   return match ? match[1] : todayLocal();
 }
 
+/** Prefer account-based plan id in description text when available. */
+function formatRoznamchaDescription(entry) {
+  let text = String(entry.description || '');
+  const planId = entry.planDisplayId || entry.referencePlanId;
+  if (planId) {
+    // Replace any leftover plan-{uuid} fragment if description wasn't rewritten
+    text = text.replace(/plan-[0-9a-f-]{20,}/gi, planId);
+  }
+  return text;
+}
+
 function renderShell() {
   return `
     <div class="page-header">
@@ -305,13 +316,14 @@ function renderEntries(entries) {
           ${dayEntries.map((entry) => `
             <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg-secondary)">
               <div>
-                <div style="font-weight:600">${entry.description}</div>
+                <div style="font-weight:600">${formatRoznamchaDescription(entry)}</div>
                 <div class="secondary" style="margin-top:4px">${entry.type === 'purchase' ? 'Purchase' : (entry.type === 'expense' ? 'Expense' : 'Payment')}${(() => {
                   const planId = entry.planDisplayId || entry.referencePlanId;
                   const custId = entry.customerAccountNumber;
                   const bits = [];
                   if (custId) bits.push(`Customer ${custId}`);
-                  if (planId) bits.push(`Plan ${planId}`);
+                  // Avoid repeating the same ID when plan id already equals customer account
+                  if (planId && planId !== custId) bits.push(`Plan ${planId}`);
                   return bits.length ? ` · ${bits.join(' · ')}` : '';
                 })()}${entry.customerName ? ` · ${entry.customerName}` : ''}</div>
               </div>
