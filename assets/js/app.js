@@ -19,6 +19,7 @@ import { renderSidebar, setActiveNav } from './components/sidebar.js';
 import { renderNavbar } from './components/navbar.js';
 import { Config } from './config.js';
 import SiteService from './services/site.service.js';
+import { startDateInputObserver } from './components/date-input.js';
 
 // ── Theme Initialization ──────────────────────────────────────
 (function initTheme() {
@@ -479,6 +480,9 @@ async function init() {
 
   // Initial route
   await route();
+
+  // Force dd-mm-yyyy on all date pickers (including modals)
+  startDateInputObserver();
 
   // Show floating buttons if logged in
   if (AuthService.isLoggedIn()) renderFloatingButtons();
