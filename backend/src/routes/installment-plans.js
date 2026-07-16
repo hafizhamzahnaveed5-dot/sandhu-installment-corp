@@ -376,7 +376,7 @@ router.get('/:id/settlement-preview', requireMinRole('manager'), asyncHandler(as
  * Body: { method: 'cash'|'bank'|'online', notes?: string }
  */
 router.post('/:id/settle', requireMinRole('manager'), asyncHandler(async (req, res) => {
-  const { method, notes } = req.body || {};
+  const { method, notes, paidAt } = req.body || {};
   if (!method) return fail(res, 400, 'Payment method is required.');
   if (!['cash', 'bank', 'online'].includes(method)) return fail(res, 400, 'Invalid payment method.');
 
@@ -392,8 +392,8 @@ router.post('/:id/settle', requireMinRole('manager'), asyncHandler(async (req, r
   if (plan.status === 'cancelled') return fail(res, 400, 'Cannot settle a cancelled plan.');
 
   const payment = await withTransaction(async (client) => {
-    // Re-calculate inside the transaction to prevent race conditions
-    const breakdown = await calculateSettlementBreakdown(client, req.params.id);
+    const asOf = paidAt || new Date();
+    const breakdown = await calculateSettlementBreakdown(client, req.params.id, asOf);
 
     if (!breakdown.hasOpenRows) {
       throw Object.assign(new Error('All installments are already paid — nothing to settle.'), { status: 400 });
@@ -407,6 +407,7 @@ router.post('/:id/settle', requireMinRole('manager'), asyncHandler(async (req, r
       userId: req.user.id,
       notes,
       breakdown,
+      paidAt: asOf,
     });
 
     return result;

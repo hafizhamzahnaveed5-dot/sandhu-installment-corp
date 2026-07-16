@@ -1,20 +1,12 @@
 /**
- * receipt.js — Printable transaction receipt
- *
- * Print layout is fully independent of app theme.
- * The print.css resets all CSS variables at :root so the output
- * is always plain black-on-white regardless of dark/light mode.
- *
- * Fields on every printed receipt:
- *   Business name, customer name, CNIC, plan ID,
- *   installment #, amount paid, payment date, receipt #,
- *   payment method, received-by, outstanding balance after payment.
+ * receipt.js — Professional printable payment receipt
  */
 
 import { renderNavbar } from '../components/navbar.js';
 import InstallmentsService from '../services/installments.service.js';
 import { formatCurrency, formatDate, Config } from '../config.js';
 import AuthService from '../services/auth.service.js';
+import SiteService from '../services/site.service.js';
 import Modal from '../components/modal.js';
 import Toast from '../components/toast.js';
 
@@ -25,11 +17,15 @@ export default async function init({ param }) {
   const content = document.getElementById('page-content');
   content.innerHTML = `<div class="skeleton" style="height:500px;border-radius:var(--radius-md)"></div>`;
 
+  await SiteService.load().catch(() => {});
+  const site = SiteService.getCached();
+  const receiptFooter = site?.web_content?.receiptFooter
+    || 'This is a computer-generated receipt and is valid without a physical stamp.';
+
   const payRes = await InstallmentsService.getPaymentById(paymentId);
   if (!payRes.success) {
     content.innerHTML = `
       <div class="empty-state">
-        <span style="font-size:60px">🔍</span>
         <h3>Receipt not found</h3>
         <p>Payment ID "${paymentId}" could not be located.</p>
         <a href="#/payments" class="btn btn-primary mt-4">← Back to Payments</a>
@@ -39,217 +35,155 @@ export default async function init({ param }) {
   }
 
   const p = payRes.data;
-  const currentUser = AuthService.getUser();
-
-  // Calculate outstanding balance after this payment
+  const isReversed = p.status === 'reversed';
   let outstandingAfter = '—';
   if (p.planId) {
     const schedRes = await InstallmentsService.getSchedule(p.planId);
     if (schedRes.success) {
-      const unpaid = schedRes.data.filter(s => s.status !== 'paid');
-      const totalDue = unpaid.reduce((sum, s) => sum + s.amountDue, 0);
-      outstandingAfter = formatCurrency(totalDue);
+      const unpaid = (schedRes.data || []).filter(s => s.status !== 'paid' && s.status !== 'settled');
+      outstandingAfter = formatCurrency(unpaid.reduce((sum, s) => sum + Math.max(0, Number(s.amountDue) - Number(s.amountPaid || 0)), 0));
     }
   }
 
-  // Find installment number from schedule if available
-  let installmentNo = p.installmentNumber || '—';
-
+  const installmentNo = p.installmentNumber || (p.isEarlySettlement ? 'Settlement' : '—');
+  const receivedBy = p.receivedByName || AuthService.getUser()?.name || 'Sandhu IC Staff';
   const printDate = new Date().toLocaleDateString('en-PK', {
     year: 'numeric', month: 'long', day: 'numeric',
   });
 
   content.innerHTML = `
-    <!-- Breadcrumb (screen only) -->
     <div class="breadcrumb no-print" style="margin-bottom:var(--space-5)">
       <a href="#/payments">Payments</a>
       <span class="sep">/</span>
       <span class="current">Receipt #${p.receiptNumber}</span>
     </div>
 
-    <!-- Print action bar (screen only) -->
-    <div class="no-print" style="display:flex;align-items:center;justify-content:space-between;
-                                  margin-bottom:var(--space-5);flex-wrap:wrap;gap:var(--space-3)">
+    <div class="no-print" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-5);flex-wrap:wrap;gap:var(--space-3)">
       <div style="font-size:14px;color:var(--color-text-secondary)">
-        Receipt previewed below. The printed output is always black-and-white.
+        Professional receipt preview · print output is black & white
       </div>
-      <div style="display:flex;gap:var(--space-3)">
+      <div style="display:flex;gap:var(--space-3);flex-wrap:wrap">
         <a href="#/payments" class="btn btn-secondary">← Back</a>
-        <button class="btn btn-primary" onclick="window.print()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="6 9 6 2 18 2 18 9"/>
-            <path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>
-            <rect x="6" y="14" width="12" height="8"/>
-          </svg>
-          Print Receipt
-        </button>
-        ${(AuthService.isAdmin() && p.status !== 'reversed') ? `
-          <button class="btn btn-danger" id="btn-revert-payment">
-            Reverse Payment
-          </button>
+        ${p.planId ? `<a href="#/installments/${p.planId}" class="btn btn-ghost">View Plan</a>` : ''}
+        <button class="btn btn-primary" onclick="window.print()">Print Receipt</button>
+        ${(AuthService.isAdmin() && !isReversed) ? `
+          <button class="btn btn-danger" id="btn-revert-payment">Reverse Payment</button>
         ` : ''}
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════════
-         RECEIPT CARD — this is what gets printed
-         All styles inside here must work in @media print too.
-         The print.css handles variable overrides.
-         ═══════════════════════════════════════════════════════════ -->
-    <div class="receipt-card" style="max-width:640px;margin:0 auto;position:relative">
+    <article class="receipt-card ${isReversed ? 'receipt-void' : ''}" id="printable-receipt"
+      style="max-width:700px;margin:0 auto;padding:32px 36px;background:var(--color-bg-secondary);
+             border:1px solid var(--color-border-strong);border-radius:var(--radius-lg);
+             box-shadow:var(--shadow-md);position:relative">
 
-      <!-- Business Header -->
-      <div class="receipt-header" style="display:flex;justify-content:space-between;
-                                          align-items:flex-start;padding-bottom:16px;
-                                          border-bottom:2px solid var(--color-border)">
-        <div style="display:flex;align-items:center;gap:12px">
-          <div class="receipt-logo-icon sidebar-logo-icon"
-               style="width:44px;height:44px;border-radius:8px;
-                      background:var(--color-accent-blue);display:flex;
-                      align-items:center;justify-content:center;flex-shrink:0">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-            </svg>
-          </div>
-          <div>
-            <div style="font-size:16px;font-weight:700;color:var(--color-text-primary)">
-              ${Config.BUSINESS.NAME}
-            </div>
-            <div style="font-size:11px;color:var(--color-text-tertiary)">
-              ${Config.BUSINESS.ADDRESS}
-            </div>
-            <div style="font-size:11px;color:var(--color-text-tertiary)">
-              ${Config.BUSINESS.PHONE}
-            </div>
-          </div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-size:18px;font-weight:800;letter-spacing:.05em;
-                      color:var(--color-accent-green)">PAYMENT RECEIPT</div>
-          ${p.status === 'reversed' ? `<div style="font-size:14px;font-weight:800;letter-spacing:.05em;color:var(--color-accent-red);margin-top:4px">VOID / REVERSED</div>` : ''}
-          <div style="font-size:13px;font-family:var(--font-mono);font-weight:600;
-                      color:var(--color-text-secondary);margin-top:4px">
-            # ${p.receiptNumber}
-          </div>
-          <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:2px">
-            Printed: ${printDate}
-          </div>
-        </div>
-      </div>
+      ${isReversed ? `<div class="receipt-void-stamp">VOID</div>` : ''}
 
-      <!-- Customer & Transaction Info Grid -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;
-                  margin-top:20px;padding-bottom:20px;
-                  border-bottom:1px solid var(--color-border)">
+      <header class="receipt-header" style="display:flex;justify-content:space-between;gap:20px;padding-bottom:18px;border-bottom:3px double var(--color-border-strong)">
         <div>
-          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;
-                      color:var(--color-text-tertiary);font-weight:600;margin-bottom:8px">
-            Customer Details
+          <div style="font-size:20px;font-weight:800;letter-spacing:.02em;color:var(--color-text-primary)">${Config.BUSINESS.NAME}</div>
+          <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px">${Config.BUSINESS.TAGLINE || ''}</div>
+          <div style="font-size:12px;color:var(--color-text-tertiary);margin-top:8px;line-height:1.5">
+            ${Config.BUSINESS.ADDRESS}<br>
+            ${Config.BUSINESS.PHONE} · ${Config.BUSINESS.EMAIL}
           </div>
-          <div style="font-size:15px;font-weight:700;color:var(--color-text-primary);margin-bottom:3px">
-            ${p.customer?.fullName || 'Valued Customer'}
-          </div>
-          <div style="font-size:12px;color:var(--color-text-secondary)">
-            📞 ${p.customer?.phone || '—'}
-          </div>
-          <div style="font-size:12px;color:var(--color-text-secondary)">
-            🪪 CNIC: ${p.customer?.cnicOrId || '—'}
+        </div>
+        <div style="text-align:right;min-width:180px">
+          <div style="font-size:13px;font-weight:800;letter-spacing:.12em;color:var(--color-accent-teal,#0F766E)">PAYMENT RECEIPT</div>
+          ${isReversed ? `<div style="margin-top:6px;font-size:12px;font-weight:800;color:var(--color-accent-red)">REVERSED / VOID</div>` : ''}
+          <div style="margin-top:10px;font-family:var(--font-mono);font-size:18px;font-weight:700">#${p.receiptNumber}</div>
+          <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:4px">Printed ${printDate}</div>
+        </div>
+      </header>
+
+      <section style="display:grid;grid-template-columns:1fr 1fr;gap:28px;margin:22px 0;padding-bottom:18px;border-bottom:1px solid var(--color-border)">
+        <div>
+          <div class="receipt-section-label">Billed To</div>
+          <div style="font-size:16px;font-weight:700">${p.customer?.fullName || 'Valued Customer'}</div>
+          <div style="font-size:13px;color:var(--color-text-secondary);margin-top:6px;line-height:1.6">
+            ${p.customer?.accountNumber ? `Account ID: <strong>${p.customer.accountNumber}</strong><br>` : ''}
+            Phone: ${p.customer?.phone || '—'}<br>
+            CNIC: ${p.customer?.cnicOrId || '—'}
           </div>
         </div>
         <div>
-          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;
-                      color:var(--color-text-tertiary);font-weight:600;margin-bottom:8px">
-            Transaction Details
-          </div>
-          <div style="display:flex;flex-direction:column;gap:3px;font-size:12px">
-            <div><strong>Date:</strong> ${formatDate(p.paidAt)}</div>
-            <div><strong>Method:</strong> ${p.method?.toUpperCase() || '—'}</div>
-            <div><strong>Plan ID:</strong> #${p.planId}</div>
-            <div><strong>Installment #:</strong> ${installmentNo}</div>
-            ${p.isEarlySettlement ? `<div style="color:var(--color-accent-purple);font-weight:bold;margin-top:4px">✨ Early Settlement</div>` : ''}
-          </div>
+          <div class="receipt-section-label">Payment Details</div>
+          <table class="receipt-meta-table">
+            <tr><td>Payment Date</td><td><strong>${formatDate(p.paidAt)}</strong></td></tr>
+            <tr><td>Method</td><td>${(p.method || '—').toUpperCase()}</td></tr>
+            <tr><td>Plan</td><td>${p.planId || '—'}</td></tr>
+            <tr><td>Installment</td><td>${installmentNo}</td></tr>
+            ${p.isEarlySettlement ? `<tr><td>Type</td><td><strong>Early Settlement</strong></td></tr>` : ''}
+          </table>
         </div>
-      </div>
+      </section>
 
-      <!-- Amount Box -->
-      <div style="margin:24px 0;padding:24px;border:2px solid var(--color-border);
-                  border-radius:var(--radius-md);text-align:center;
-                  background:var(--color-bg-secondary)">
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;
-                    color:var(--color-text-tertiary);font-weight:600;margin-bottom:8px">
-          Amount Collected
-        </div>
-        <div style="font-size:42px;font-weight:800;font-family:var(--font-mono);
-                    color:var(--color-accent-green);line-height:1">
+      <section style="margin:8px 0 24px;padding:22px;border:2px solid var(--color-border-strong);border-radius:var(--radius-md);text-align:center;background:var(--color-bg-elevated)">
+        <div class="receipt-section-label" style="margin-bottom:8px">Amount Received</div>
+        <div style="font-size:40px;font-weight:800;font-family:var(--font-mono);color:var(--color-accent-green);line-height:1">
           ${formatCurrency(p.amount)}
         </div>
         <div style="margin-top:8px;font-size:12px;color:var(--color-text-secondary)">
-          ${p.amount && p.amount.toLocaleString ? `PKR ${p.amount.toLocaleString('en-PK')} only` : ''}
+          ${Number(p.amount || 0).toLocaleString('en-PK')} Pakistan Rupees only
         </div>
-        ${p.isEarlySettlement && p.markupWaived > 0 ? `
-        <div style="margin-top:12px;padding:8px;background:var(--color-accent-purple-dim);color:var(--color-accent-purple);border-radius:4px;font-size:12px;font-weight:bold">
-          Future Markup Waived: ${formatCurrency(p.markupWaived)}
+        ${p.isEarlySettlement && Number(p.markupWaived || 0) > 0 ? `
+          <div style="margin-top:12px;font-size:12px;font-weight:600;color:var(--color-accent-navy)">
+            Markup waived: ${formatCurrency(p.markupWaived)}
+          </div>` : ''}
+      </section>
+
+      <section style="display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--color-border);border-radius:var(--radius-sm);margin-bottom:22px;background:var(--color-bg-primary)">
+        <span style="font-size:13px;color:var(--color-text-secondary)">Outstanding after this payment</span>
+        <strong style="font-family:var(--font-mono)">${outstandingAfter}</strong>
+      </section>
+
+      <section style="font-size:12px;color:var(--color-text-secondary);margin-bottom:28px">
+        <strong>Received by:</strong> ${receivedBy}
+        ${p.notes ? `<div style="margin-top:6px"><strong>Notes:</strong> ${p.notes}</div>` : ''}
+        ${isReversed && p.reversalReason ? `<div style="margin-top:6px;color:var(--color-accent-red)"><strong>Reversal reason:</strong> ${p.reversalReason}</div>` : ''}
+      </section>
+
+      <footer style="display:flex;justify-content:space-between;gap:24px;padding-top:18px;border-top:1px solid var(--color-border)">
+        <div style="text-align:center;flex:1">
+          <div style="height:40px;border-bottom:1.5px solid var(--color-text-tertiary);margin-bottom:6px"></div>
+          <div style="font-size:11px;font-weight:600;color:var(--color-text-tertiary)">Authorized Signature</div>
         </div>
-        ` : ''}
-      </div>
-
-      <!-- Outstanding Balance -->
-      <div style="display:flex;justify-content:space-between;align-items:center;
-                  padding:12px 16px;border:1px solid var(--color-border);
-                  border-radius:var(--radius-sm);margin-bottom:24px;
-                  background:var(--color-bg-secondary)">
-        <span style="font-size:13px;color:var(--color-text-secondary);font-weight:500">
-          Outstanding Balance After This Payment:
-        </span>
-        <span style="font-size:14px;font-weight:700;font-family:var(--font-mono);
-                     color:var(--color-text-primary)">
-          ${outstandingAfter}
-        </span>
-      </div>
-
-      <!-- Received By & Notes -->
-      <div style="font-size:12px;color:var(--color-text-secondary);
-                  margin-bottom:40px;padding:10px 14px;
-                  border-left:3px solid var(--color-border)">
-        <strong>Received by:</strong> ${currentUser?.name || 'Sandhu IC Staff'} &nbsp;|&nbsp;
-        <strong>Date:</strong> ${printDate}
-      </div>
-
-      <!-- Signature Lines -->
-      <div style="display:flex;justify-content:space-between;
-                  padding-top:16px;border-top:1px solid var(--color-border)">
-        <div style="text-align:center">
-          <div style="width:160px;border-bottom:1.5px solid var(--color-text-tertiary);height:36px"></div>
-          <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:5px;font-weight:600">
-            Authorized Signature
-          </div>
+        <div style="text-align:center;flex:1">
+          <div style="height:40px;border-bottom:1.5px solid var(--color-text-tertiary);margin-bottom:6px"></div>
+          <div style="font-size:11px;font-weight:600;color:var(--color-text-tertiary)">Customer Signature</div>
         </div>
-        <div style="text-align:center">
-          <div style="width:160px;border-bottom:1.5px solid var(--color-text-tertiary);height:36px"></div>
-          <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:5px;font-weight:600">
-            Customer Signature
-          </div>
-        </div>
-      </div>
+      </footer>
 
-      <!-- Footer note -->
-      <div style="margin-top:20px;text-align:center;font-size:10px;
-                  color:var(--color-text-tertiary);border-top:1px dashed var(--color-border);
-                  padding-top:12px">
-        This is a computer-generated receipt and is valid without a physical stamp.
-        For queries: ${Config.BUSINESS.PHONE} · ${Config.BUSINESS.EMAIL}
+      <div style="margin-top:18px;text-align:center;font-size:10px;color:var(--color-text-tertiary);border-top:1px dashed var(--color-border);padding-top:12px">
+        ${receiptFooter}<br>
+        ${Config.BUSINESS.PHONE} · ${Config.BUSINESS.EMAIL}
       </div>
-    </div>
+    </article>
+
+    <style>
+      .receipt-section-label {
+        font-size: 10px; text-transform: uppercase; letter-spacing: .12em;
+        color: var(--color-text-tertiary); font-weight: 700; margin-bottom: 8px;
+      }
+      .receipt-meta-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      .receipt-meta-table td { padding: 3px 0; vertical-align: top; }
+      .receipt-meta-table td:first-child { color: var(--color-text-secondary); width: 42%; }
+      .receipt-void-stamp {
+        position: absolute; top: 46%; left: 50%; transform: translate(-50%, -50%) rotate(-18deg);
+        font-size: 72px; font-weight: 900; letter-spacing: .1em; color: rgba(220,38,38,.18);
+        border: 6px solid rgba(220,38,38,.25); padding: 8px 28px; border-radius: 12px;
+        pointer-events: none; z-index: 2;
+      }
+    </style>
   `;
 
-  // Bind reverse event
   const revertBtn = document.getElementById('btn-revert-payment');
   if (revertBtn) {
     revertBtn.addEventListener('click', () => {
       const modal = Modal.create({
         title: 'Reverse Payment',
         content: `
-          <p>Are you sure you want to reverse this payment of <strong>${formatCurrency(p.amount)}</strong>? This will re-open the installment schedule and adjust balances. This cannot be undone.</p>
+          <p>Reverse <strong>${formatCurrency(p.amount)}</strong> dated <strong>${formatDate(p.paidAt)}</strong>? This re-opens the installment and removes the Roznamcha payment entry.</p>
           <div class="form-group" style="margin-top:16px">
             <label class="form-label">Reason for reversal <span class="required">*</span></label>
             <input type="text" id="reversal-reason" class="form-control" placeholder="E.g., Cheque bounced, entered by mistake" required minlength="5">
@@ -258,10 +192,9 @@ export default async function init({ param }) {
         footer: `
           <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
           <button class="btn btn-danger" id="modal-confirm">Confirm Reversal</button>
-        `
+        `,
       });
       modal.open();
-      
       modal.backdrop.querySelector('#modal-cancel').addEventListener('click', modal.destroy);
       modal.backdrop.querySelector('#modal-confirm').addEventListener('click', async () => {
         const reason = modal.backdrop.querySelector('#reversal-reason').value;
@@ -269,17 +202,14 @@ export default async function init({ param }) {
           Toast.warning('Validation', 'Please provide a reason of at least 5 characters.');
           return;
         }
-        
         const confirmBtn = modal.backdrop.querySelector('#modal-confirm');
         confirmBtn.classList.add('loading');
-        
         const result = await InstallmentsService.revertPayment(p.id, reason);
         confirmBtn.classList.remove('loading');
-        
         if (result.success) {
           Toast.success('Reversed', 'Payment reversed successfully.');
           modal.destroy();
-          init({ param }); // Reload receipt page
+          init({ param });
         } else {
           Toast.error('Error', result.error);
         }

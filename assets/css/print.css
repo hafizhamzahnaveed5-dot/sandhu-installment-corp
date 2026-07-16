@@ -222,7 +222,7 @@
     page-break-inside: avoid;
   }
 
-  /* ── 16. PAID watermark — behind text, light enough for legibility ── */
+  /* ── 16. Watermark — PAID or VOID ── */
   .receipt-card::after {
     content: 'PAID';
     position: absolute;
@@ -240,5 +240,9 @@
     pointer-events: none;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+  .receipt-card.receipt-void::after {
+    content: 'VOID';
+    color: rgba(180,0,0,0.18) !important;
   }
 }

@@ -78,13 +78,16 @@ router.get('/:id', asyncHandler(async (req, res) => {
 }));
 
 router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
-  const { fullName, phone } = req.body || {};
+  const { fullName, phone, accountNumber } = req.body || {};
   if (!fullName || !phone) return fail(res, 400, 'Customer fullName and phone are required.');
+  if (!accountNumber || String(accountNumber).trim() === '') {
+    return fail(res, 400, 'Customer ID / Account Number is required (use your manual ledger ID).');
+  }
 
   const customer = {
     id: newId('cust'),
     fullName,
-    accountNumber: req.body.accountNumber || null,
+    accountNumber: String(accountNumber).trim(),
     cnicOrId: req.body.cnicOrId || null,
     phone,
     email: req.body.email || null,

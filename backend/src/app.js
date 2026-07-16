@@ -13,6 +13,7 @@ import userRoutes from './routes/users.js';
 import productRoutes from './routes/products.js';
 import categoryRoutes from './routes/categories.js';
 import roznamchaRoutes from './routes/roznamcha.js';
+import siteSettingsRoutes from './routes/site-settings.js';
 
 export function createApp() {
   const app = express();
@@ -37,6 +38,7 @@ export function createApp() {
   app.use('/api/products', productRoutes);
   app.use('/api/categories', categoryRoutes);
   app.use('/api/roznamcha', roznamchaRoutes);
+  app.use('/api/site-settings', siteSettingsRoutes);
 
   app.use((_req, res) => fail(res, 404, 'Endpoint not found.'));
   app.use((error, _req, res, _next) => {

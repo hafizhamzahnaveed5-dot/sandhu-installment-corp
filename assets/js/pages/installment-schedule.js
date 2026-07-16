@@ -338,8 +338,13 @@ function showDeletePlanModal(plan, onSuccess) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Record Payment Modal (normal flow)
 // ─────────────────────────────────────────────────────────────────────────────
+function localToday() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
 function showPaymentModal(schedId, number, amount, planId, onSuccess) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   const modal = Modal.create({
     title: 'Record Installment Payment',
     content: `
@@ -353,8 +358,9 @@ function showPaymentModal(schedId, number, amount, planId, onSuccess) {
           <input type="number" id="pay-amount" class="form-control" value="${amount}" required/>
         </div>
         <div class="form-group full-width">
-          <label class="form-label" for="pay-date">Payment Date</label>
+          <label class="form-label" for="pay-date">Payment Date (from your manual ledger)</label>
           <input type="date" id="pay-date" class="form-control" value="${today}" required />
+          <span class="form-help">Use the real collection date — not today's date — when entering old ledger payments.</span>
         </div>
         <div class="form-group full-width">
           <label class="form-label" for="pay-method">Payment Method</label>
@@ -405,7 +411,7 @@ function showPaymentModal(schedId, number, amount, planId, onSuccess) {
     confirmBtn.classList.remove('loading');
 
     if (result.success) {
-      Toast.success('Success', 'Payment recorded successfully.');
+      Toast.success('Success', `Payment recorded for ${payDate}.`);
       modal.destroy();
       onSuccess();
     } else {
@@ -502,6 +508,10 @@ async function showSettlementModal(plan, onSuccess) {
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="form-group" style="margin:0">
+        <label class="form-label" for="settle-date">Settlement Date</label>
+        <input type="date" id="settle-date" class="form-control" value="${b.asOfDate || new Date().toISOString().slice(0,10)}"/>
+      </div>
+      <div class="form-group" style="margin:0">
         <label class="form-label" for="settle-method">Payment Method <span class="required">*</span></label>
         <select id="settle-method" class="form-control">
           <option value="cash">Cash</option>
@@ -509,7 +519,7 @@ async function showSettlementModal(plan, onSuccess) {
           <option value="online">Online (JazzCash / Easypaisa)</option>
         </select>
       </div>
-      <div class="form-group" style="margin:0">
+      <div class="form-group" style="margin:0;grid-column:1/-1">
         <label class="form-label" for="settle-notes">Notes</label>
         <input type="text" id="settle-notes" class="form-control" placeholder="Optional reference / remarks"/>
       </div>
@@ -534,11 +544,12 @@ async function showSettlementModal(plan, onSuccess) {
   confirmBtn.addEventListener('click', async () => {
     const method = modal.backdrop.querySelector('#settle-method').value;
     const notes  = modal.backdrop.querySelector('#settle-notes').value;
+    const paidAt = modal.backdrop.querySelector('#settle-date')?.value || b.asOfDate;
 
     confirmBtn.classList.add('loading');
     confirmBtn.disabled = true;
 
-    const result = await InstallmentsService.settleEarly(plan.id, { method, notes });
+    const result = await InstallmentsService.settleEarly(plan.id, { method, notes, paidAt });
 
     confirmBtn.classList.remove('loading');
     confirmBtn.disabled = false;

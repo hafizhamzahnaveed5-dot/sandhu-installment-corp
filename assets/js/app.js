@@ -18,12 +18,16 @@ import AuthService from './services/auth.service.js';
 import { renderSidebar, setActiveNav } from './components/sidebar.js';
 import { renderNavbar } from './components/navbar.js';
 import { Config } from './config.js';
+import SiteService from './services/site.service.js';
 
 // ── Theme Initialization ──────────────────────────────────────
 (function initTheme() {
   const saved = localStorage.getItem('sic_theme') || 'light';
   document.documentElement.dataset.theme = saved;
 })();
+
+// Prefetch site settings (non-blocking)
+SiteService.load().catch(() => {});
 
 // ── Route Map ─────────────────────────────────────────────────
 // DECISION: Each route is a lazy-loaded ES module.
@@ -47,6 +51,7 @@ const ROUTES = {
   'reports':             () => import('./pages/reports.js'),
   'analytics':           () => import('./pages/analytics.js'),
   'settings':            () => import('./pages/settings.js'),
+  'web-content':         () => import('./pages/web-content.js'),
   'profile':             () => import('./pages/profile.js'),
   'users':               () => import('./pages/users.js'),
   'audit-logs':          () => import('./pages/audit-logs.js'),

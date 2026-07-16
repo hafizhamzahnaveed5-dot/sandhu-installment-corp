@@ -104,7 +104,7 @@ router.post('/', requireMinRole('agent'), asyncHandler(async (req, res) => {
        RETURNING *`,
       [
         newId('pay'), planId, scheduleId, scheduleRow.customer_id, amount, method, req.user.id,
-        receiptNumber(sequence.rows[0].next_number), paidAtDate, req.body.notes || '',
+        receiptNumber(sequence.rows[0].next_number), paidAt, req.body.notes || '',
         isEarlySettlement, 0,
       ]
     );
@@ -251,6 +251,10 @@ router.get('/', asyncHandler(async (req, res) => {
   }
 
   where.push(`p.status = 'posted'`);
+  if (String(req.query.includeReversed || '') === 'true') {
+    where.pop();
+    where.push(`p.status IN ('posted', 'reversed')`);
+  }
   const whereSql = `WHERE ${where.join(' AND ')}`;
   const count = await pool.query(`SELECT count(*)::int AS total FROM payments p ${whereSql}`, values);
   const result = await pool.query(
@@ -291,23 +295,6 @@ router.put('/:id/reverse', requireRole('admin'), asyncHandler(async (req, res) =
     const row = paymentResult.rows[0];
     if (row.status === 'reversed') throw Object.assign(new Error('Payment is already reversed.'), { status: 400 });
 
-    const scheduleResult = await client.query(
-      `SELECT *
-       FROM installment_schedules
-       WHERE id = $1
-       FOR UPDATE`,
-      [row.schedule_id]
-    );
-    if (!scheduleResult.rowCount) throw Object.assign(new Error('Payment schedule row not found.'), { status: 404 });
-
-    const schedule = scheduleResult.rows[0];
-    const nextPaid = Math.max(Number(schedule.amount_paid || 0) - Number(row.amount || 0), 0);
-    const amountDue = Number(schedule.amount_due || 0);
-    const paidRatio = amountDue > 0 ? Math.min(nextPaid / amountDue, 1) : 0;
-    const principalPaid = Number((Number(schedule.principal_due || 0) * paidRatio).toFixed(2));
-    const markupEarned = Number((Number(schedule.markup_amount || 0) * paidRatio).toFixed(2));
-    const nextStatus = nextPaid > 0 ? 'partial' : null;
-
     await client.query(
       `UPDATE payments
        SET status = 'reversed',
@@ -318,7 +305,14 @@ router.put('/:id/reverse', requireRole('admin'), asyncHandler(async (req, res) =
       [row.id, req.user.id, reason]
     );
 
-    if (row.is_early_settlement) {
+    // Remove auto-created Roznamcha payment_received entry for this payment
+    await client.query(
+      `DELETE FROM roznamcha_entries
+       WHERE reference_payment_id = $1 AND type = 'payment_received'`,
+      [row.id]
+    );
+
+    if (row.is_early_settlement || !row.schedule_id) {
       await client.query(
         `UPDATE installment_schedules
          SET amount_paid = 0,
@@ -331,10 +325,15 @@ router.put('/:id/reverse', requireRole('admin'), asyncHandler(async (req, res) =
              closed_reason = NULL,
              updated_at = now()
          WHERE plan_id = $1
-           AND closed_reason IN ('early-settlement', 'early-settlement-paid-through-date')`,
+           AND (
+             closed_reason IN ('early-settlement', 'early-settlement-paid-through-date')
+             OR status IN ('settled', 'paid')
+           )`,
         [row.plan_id]
       );
 
+      // Re-open only rows that were closed by this settlement; restore paid rows from other payments carefully
+      // For early settlement: reset all non-partial history closed by settlement
       await client.query(
         `UPDATE installment_plans
          SET markup_waived = 0,
@@ -345,7 +344,70 @@ router.put('/:id/reverse', requireRole('admin'), asyncHandler(async (req, res) =
          WHERE id = $1`,
         [row.plan_id]
       );
+
+      // Rebuild schedule paid amounts from remaining posted payments
+      await client.query(
+        `UPDATE installment_schedules s
+         SET amount_paid = 0,
+             principal_paid = 0,
+             markup_earned = 0,
+             markup_waived = 0,
+             paid_date = NULL,
+             closed_reason = NULL,
+             status = ${statusForUnpaidDueDateSql('s')},
+             amount_due = s.principal_due + s.markup_amount,
+             updated_at = now()
+         WHERE s.plan_id = $1`,
+        [row.plan_id]
+      );
+
+      const remaining = await client.query(
+        `SELECT schedule_id, SUM(amount)::numeric AS total
+         FROM payments
+         WHERE plan_id = $1 AND status = 'posted' AND schedule_id IS NOT NULL
+         GROUP BY schedule_id`,
+        [row.plan_id]
+      );
+      for (const rem of remaining.rows) {
+        const sch = await client.query(
+          `SELECT * FROM installment_schedules WHERE id = $1 FOR UPDATE`,
+          [rem.schedule_id]
+        );
+        if (!sch.rowCount) continue;
+        const schedule = sch.rows[0];
+        const nextPaid = Math.min(Number(rem.total), Number(schedule.amount_due));
+        const paidRatio = Number(schedule.amount_due) > 0 ? Math.min(nextPaid / Number(schedule.amount_due), 1) : 0;
+        const principalPaid = Number((Number(schedule.principal_due || 0) * paidRatio).toFixed(2));
+        const markupEarned = Number((Number(schedule.markup_amount || 0) * paidRatio).toFixed(2));
+        const nextStatus = nextPaid >= Number(schedule.amount_due) ? 'paid' : (nextPaid > 0 ? 'partial' : null);
+        await client.query(
+          `UPDATE installment_schedules
+           SET amount_paid = $2, principal_paid = $3, markup_earned = $4,
+               status = COALESCE($5::text, ${statusForUnpaidDueDateSql()}),
+               paid_date = CASE WHEN $5 = 'paid' THEN COALESCE(paid_date, now()) ELSE paid_date END,
+               updated_at = now()
+           WHERE id = $1`,
+          [rem.schedule_id, nextPaid, principalPaid, markupEarned, nextStatus]
+        );
+      }
     } else {
+      const scheduleResult = await client.query(
+        `SELECT *
+         FROM installment_schedules
+         WHERE id = $1
+         FOR UPDATE`,
+        [row.schedule_id]
+      );
+      if (!scheduleResult.rowCount) throw Object.assign(new Error('Payment schedule row not found.'), { status: 404 });
+
+      const schedule = scheduleResult.rows[0];
+      const nextPaid = Math.max(Number(schedule.amount_paid || 0) - Number(row.amount || 0), 0);
+      const amountDue = Number(schedule.amount_due || 0);
+      const paidRatio = amountDue > 0 ? Math.min(nextPaid / amountDue, 1) : 0;
+      const principalPaid = Number((Number(schedule.principal_due || 0) * paidRatio).toFixed(2));
+      const markupEarned = Number((Number(schedule.markup_amount || 0) * paidRatio).toFixed(2));
+      const nextStatus = nextPaid > 0 ? 'partial' : null;
+
       await client.query(
         `UPDATE installment_schedules
          SET amount_paid = $2::numeric,
@@ -406,7 +468,23 @@ router.get('/:id', asyncHandler(async (req, res) => {
     [payment.plan_id]
   );
   const customer = await pool.query('SELECT * FROM customers WHERE id = $1', [payment.customer_id]);
-  return ok(res, { ...mapPayment(payment), plan: mapPlan(plan.rows[0]), customer: mapCustomer(customer.rows[0]) });
+  let installmentNumber = null;
+  let receivedByName = null;
+  if (payment.schedule_id) {
+    const sch = await pool.query('SELECT installment_number FROM installment_schedules WHERE id = $1', [payment.schedule_id]);
+    installmentNumber = sch.rows[0]?.installment_number ?? null;
+  }
+  if (payment.received_by) {
+    const u = await pool.query('SELECT name FROM users WHERE id = $1', [payment.received_by]);
+    receivedByName = u.rows[0]?.name || null;
+  }
+  return ok(res, {
+    ...mapPayment(payment),
+    installmentNumber,
+    receivedByName,
+    plan: mapPlan(plan.rows[0]),
+    customer: mapCustomer(customer.rows[0]),
+  });
 }));
 
 export default router;

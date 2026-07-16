@@ -52,12 +52,22 @@ export default async function init() {
         <div id="step-1-content">
           <div class="form-grid">
             <div class="form-group full-width">
-              <label class="form-label" for="plan-customer">Select Customer <span class="required">*</span></label>
+              <label class="form-label" for="plan-account-id">Customer ID / Account No. <span class="required">*</span></label>
+              <div style="display:flex;gap:10px">
+                <input type="text" id="plan-account-id" class="form-control" placeholder="Type manual customer ID e.g. 1042" value="">
+                <button type="button" class="btn btn-secondary" id="btn-lookup-customer" style="flex-shrink:0">Find</button>
+              </div>
+              <small class="form-help">Use the same customer ID from your manual ledger / Roznamcha.</small>
+              <div id="plan-customer-match" class="secondary" style="margin-top:8px"></div>
+            </div>
+
+            <div class="form-group full-width">
+              <label class="form-label" for="plan-customer">Or Select Customer</label>
               <select id="plan-customer" class="form-control" required>
                 <option value="">-- Choose Customer --</option>
                 ${customers.map(c => `
-                  <option value="${c.id}" ${c.id === preSelectedCustomerId ? 'selected' : ''}>
-                    ${c.fullName} (${c.phone}) - Outstanding: ${formatCurrency(c.totalOutstanding)}
+                  <option value="${c.id}" data-account="${c.accountNumber || ''}" ${c.id === preSelectedCustomerId ? 'selected' : ''}>
+                    ${c.accountNumber ? `[${c.accountNumber}] ` : ''}${c.fullName} (${c.phone}) — ${formatCurrency(c.totalOutstanding)}
                   </option>
                 `).join('')}
               </select>
@@ -193,8 +203,9 @@ export default async function init() {
     </div>
   `;
 
-  // Set default start date to today
-  document.getElementById('plan-startdate').value = new Date().toISOString().split('T')[0];
+  // Set default start date to today (local calendar)
+  const _now = new Date();
+  document.getElementById('plan-startdate').value = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`;
 
   const step1Cont = document.getElementById('step-1-content');
   const step2Cont = document.getElementById('step-2-content');
@@ -203,6 +214,46 @@ export default async function init() {
 
   const prodSelect = document.getElementById('plan-product');
   const principalInput = document.getElementById('plan-principal');
+  const customerSelect = document.getElementById('plan-customer');
+  const accountInput = document.getElementById('plan-account-id');
+  const matchEl = document.getElementById('plan-customer-match');
+
+  function selectCustomerByAccount(accountId) {
+    const needle = String(accountId || '').trim().toLowerCase();
+    if (!needle) return false;
+    const option = [...customerSelect.options].find(opt =>
+      String(opt.dataset.account || '').trim().toLowerCase() === needle
+    );
+    if (!option) {
+      matchEl.textContent = `No customer found with ID "${accountId}". Add the customer first with this Account No.`;
+      matchEl.style.color = 'var(--color-accent-red)';
+      return false;
+    }
+    customerSelect.value = option.value;
+    matchEl.textContent = `Matched: ${option.textContent.trim()}`;
+    matchEl.style.color = 'var(--color-accent-green)';
+    return true;
+  }
+
+  document.getElementById('btn-lookup-customer')?.addEventListener('click', () => {
+    selectCustomerByAccount(accountInput.value);
+  });
+  accountInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      selectCustomerByAccount(accountInput.value);
+    }
+  });
+  customerSelect?.addEventListener('change', () => {
+    const opt = customerSelect.options[customerSelect.selectedIndex];
+    if (opt?.dataset?.account) accountInput.value = opt.dataset.account;
+    matchEl.textContent = opt?.value ? `Selected: ${opt.textContent.trim()}` : '';
+    matchEl.style.color = '';
+  });
+  if (preSelectedCustomerId) {
+    const opt = customerSelect.options[customerSelect.selectedIndex];
+    if (opt?.dataset?.account) accountInput.value = opt.dataset.account;
+  }
 
   // Product selection fills price
   prodSelect.addEventListener('change', () => {
@@ -233,9 +284,12 @@ export default async function init() {
 
   // Navigation Logic
   document.getElementById('btn-next-step')?.addEventListener('click', () => {
-    const custVal = document.getElementById('plan-customer').value;
+    if (accountInput.value.trim() && !customerSelect.value) {
+      selectCustomerByAccount(accountInput.value);
+    }
+    const custVal = customerSelect.value;
     if (!custVal) {
-      Toast.warning('Validation', 'Please select a customer first.');
+      Toast.warning('Validation', 'Enter Customer ID / Account No. and Find, or select a customer.');
       return;
     }
     step1Cont.classList.add('hidden');

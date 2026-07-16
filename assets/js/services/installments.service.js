@@ -234,7 +234,7 @@ const InstallmentsService = {
   },
 
   /** List payments with optional filters */
-  async listPayments({ planId = '', dateFrom = '', dateTo = '' } = {}) {
+  async listPayments({ planId = '', dateFrom = '', dateTo = '', pageSize = 500, includeReversed = true } = {}) {
     if (Config.FEATURE_FLAGS.MOCK_MODE) {
       await delay();
       let data = [...mockPayments];
@@ -243,7 +243,13 @@ const InstallmentsService = {
       if (dateTo)   data = data.filter(p => p.paidAt <= dateTo);
       return { success: true, data, error: null };
     }
-    return api.get('/payments', { planId, dateFrom, dateTo });
+    return api.get('/payments', {
+      planId,
+      dateFrom,
+      dateTo,
+      pageSize,
+      includeReversed: includeReversed ? 'true' : 'false',
+    });
   },
 
   /** Get a payment by ID (for receipt) */
@@ -387,7 +393,7 @@ const InstallmentsService = {
    * @param {string} planId
    * @param {{ method: string, notes?: string }} opts
    */
-  async settleEarly(planId, { method, notes = '' } = {}) {
+  async settleEarly(planId, { method, notes = '', paidAt = '' } = {}) {
     if (Config.FEATURE_FLAGS.MOCK_MODE) {
       await delay(600);
       const planIdx = mockPlans.findIndex(p => p.id === planId);
@@ -400,7 +406,7 @@ const InstallmentsService = {
       if (!preview.success) return preview;
       const b = preview.data;
 
-      const today = new Date().toISOString().slice(0, 10);
+      const today = paidAt || new Date().toISOString().slice(0, 10);
 
       // Close all open schedule rows
       mockSchedule.forEach((s, i) => {
@@ -435,7 +441,7 @@ const InstallmentsService = {
       EventBus.emit('payment:recorded', payment);
       return { success: true, data: payment, error: null };
     }
-    return api.post(`/installment-plans/${planId}/settle`, { method, notes });
+    return api.post(`/installment-plans/${planId}/settle`, { method, notes, paidAt });
   },
 };
 

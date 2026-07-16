@@ -108,7 +108,7 @@ const AuthService = {
     if (['login', 'forgot-password'].includes(page)) return false;
 
     // Admin-only pages
-    if (['users', 'audit-logs'].includes(page) && role !== 'admin') return false;
+    if (['users', 'audit-logs', 'web-content'].includes(page) && role !== 'admin') return false;
 
     // Pages customers cannot access
     const customerBlocked = [

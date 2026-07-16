@@ -15,10 +15,10 @@ router.get('/summary', asyncHandler(async (_req, res) => {
       (SELECT count(*)::int FROM customers WHERE status = 'active') AS total_customers,
       (SELECT count(*)::int FROM installment_plans WHERE status = 'active') AS active_plans,
       (SELECT COALESCE(sum(total_outstanding), 0)::numeric FROM customers) AS total_outstanding,
-      (SELECT COALESCE(sum(amount), 0)::numeric FROM payments WHERE date_trunc('month', paid_at) = date_trunc('month', now())) AS monthly_collection,
+      (SELECT COALESCE(sum(amount), 0)::numeric FROM payments WHERE status = 'posted' AND date_trunc('month', paid_at) = date_trunc('month', now())) AS monthly_collection,
       (SELECT count(*)::int FROM installment_schedules s WHERE s.status NOT IN ('paid', 'settled') AND s.due_date < CURRENT_DATE) AS overdue_count,
       (SELECT count(*)::int FROM installment_schedules s WHERE s.status NOT IN ('paid', 'settled') AND s.due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '2 days') AS due_soon_count,
-      (SELECT COALESCE(sum(amount), 0)::numeric FROM payments) AS total_revenue,
+      (SELECT COALESCE(sum(amount), 0)::numeric FROM payments WHERE status = 'posted') AS total_revenue,
       (SELECT COALESCE(sum(markup_earned), 0)::numeric FROM installment_schedules) AS total_profit,
       (SELECT COALESCE(sum(purchase_cost), 0)::numeric FROM installment_plans) AS total_purchase_cost,
       (SELECT COALESCE(sum(principal_amount - purchase_cost), 0)::numeric FROM installment_plans) AS total_cost_gap,
@@ -67,7 +67,7 @@ router.get('/collections', asyncHandler(async (req, res) => {
      )
      SELECT to_char(month_start, 'Mon YY') AS label, COALESCE(sum(p.amount), 0)::numeric AS amount
      FROM series
-     LEFT JOIN payments p ON date_trunc('month', p.paid_at) = series.month_start
+     LEFT JOIN payments p ON date_trunc('month', p.paid_at) = series.month_start AND p.status = 'posted'
      GROUP BY month_start
      ORDER BY month_start`,
     [months]

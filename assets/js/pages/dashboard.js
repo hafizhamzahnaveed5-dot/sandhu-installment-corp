@@ -103,7 +103,7 @@ function renderShell(user) {
         </div>
 
         <div class="card">
-          <div class="card-header"><h4>Admin Controls</h4></div>
+          <div class="card-header"><h4>Owner Control Center</h4></div>
           <div id="dash-admin-panel" style="display:flex;flex-direction:column;gap:var(--space-3)">
             <div class="skeleton" style="height:90px;border-radius:var(--radius-sm)"></div>
           </div>
@@ -143,7 +143,9 @@ function renderQuickActions() {
     { label: 'View Reports',   icon: '📈', route: 'reports' },
     { label: 'Analytics',      icon: '📉', route: 'analytics' },
     { label: 'Manage Staff',   icon: '👥', route: 'users' },
-    { label: 'Audit Logs',     icon: '📝', route: 'audit-logs' },
+    { label: 'Web Settings',   icon: '⚙️', route: 'settings' },
+    { label: 'Web Content',    icon: '📝', route: 'web-content' },
+    { label: 'Audit Logs',     icon: '🗂️', route: 'audit-logs' },
   ];
 
   actions.forEach(a => {
@@ -218,8 +220,11 @@ function refreshAdminPanel(summaryRes) {
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
       <a href="#/users" class="btn btn-secondary btn-sm">Users</a>
+      <a href="#/settings" class="btn btn-secondary btn-sm">Web Settings</a>
+      <a href="#/web-content" class="btn btn-secondary btn-sm">Web Content</a>
       <a href="#/audit-logs" class="btn btn-secondary btn-sm">Audit</a>
       <a href="#/roznamcha" class="btn btn-primary btn-sm">Roznamcha</a>
+      <a href="#/payments" class="btn btn-primary btn-sm">Payments</a>
     </div>
   `;
 }
