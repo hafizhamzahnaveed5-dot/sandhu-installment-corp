@@ -133,6 +133,10 @@ export function openCustomerFormModal({ mode = 'add', customer = null, onSaved =
       Toast.warning('Validation error', 'Full Name, Phone, and City are required.');
       return;
     }
+    if (!payload.accountNumber) {
+      Toast.warning('Validation error', 'Customer ID / Account No. is required (your manual ledger ID).');
+      return;
+    }
 
     const btn = modal.backdrop.querySelector('#save-customer-form');
     btn.classList.add('loading');
