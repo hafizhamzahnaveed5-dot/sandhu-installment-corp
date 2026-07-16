@@ -162,7 +162,26 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
   if (missing.length) return fail(res, 400, `Missing required fields: ${missing.join(', ')}.`);
 
   const round2 = (value) => Number(Number(value || 0).toFixed(2));
-  const id = newId('plan');
+
+  // Plan ID matches customer's manual account/customer ID when available
+  const customerRow = await pool.query('SELECT account_number FROM customers WHERE id = $1', [req.body.customerId]);
+  if (!customerRow.rowCount) return fail(res, 404, 'Customer not found.');
+  const accountNumber = String(customerRow.rows[0].account_number || '').trim();
+  let id = accountNumber || newId('plan');
+  if (accountNumber) {
+    const taken = await pool.query('SELECT id FROM installment_plans WHERE id = $1', [accountNumber]);
+    if (taken.rowCount) {
+      let n = 2;
+      while (n < 1000) {
+        const candidate = `${accountNumber}-${n}`;
+        const exists = await pool.query('SELECT id FROM installment_plans WHERE id = $1', [candidate]);
+        if (!exists.rowCount) { id = candidate; break; }
+        n += 1;
+      }
+      if (n >= 1000) id = newId('plan');
+    }
+  }
+
   const principalAmount    = Number(req.body.principalAmount);
   const discountAmount     = Number(req.body.discountAmount ?? 0);
   const purchaseCost       = Number(req.body.purchaseCost ?? req.body.principalAmount ?? 0);

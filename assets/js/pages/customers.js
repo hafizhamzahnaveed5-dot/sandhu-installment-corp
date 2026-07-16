@@ -62,7 +62,7 @@ export default async function init() {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        <input type="text" id="search-input" placeholder="Search by name, phone, or city..." value="${state.search}" />
+        <input type="text" id="search-input" placeholder="Search by ID, name, phone, or city..." value="${state.search}" />
       </div>
       <div class="flex gap-2">
         <button class="filter-chip ${state.status === '' ? 'active' : ''}" data-status="">All</button>
@@ -78,6 +78,7 @@ export default async function init() {
         <table class="data-table" id="customers-table">
           <thead>
             <tr>
+              <th>Customer ID</th>
               <th>Customer</th>
               <th>Phone</th>
               <th class="hide-mobile">City</th>
@@ -89,7 +90,7 @@ export default async function init() {
             </tr>
           </thead>
           <tbody id="customers-tbody">
-            ${renderTableSkeleton(7, state.view === 'costs' ? 9 : 7)}
+            ${renderTableSkeleton(7, state.view === 'costs' ? 10 : 8)}
           </tbody>
         </table>
       </div>
@@ -158,7 +159,7 @@ function renderTable(customers) {
 
   if (customers.length === 0) {
     tbody.innerHTML = `
-      <tr><td colspan="${state.view === 'costs' ? 9 : 7}">
+      <tr><td colspan="${state.view === 'costs' ? 10 : 8}">
         <div class="empty-state">
           <span style="font-size:40px">👥</span>
           <h3>No customers found</h3>
@@ -172,16 +173,21 @@ function renderTable(customers) {
   tbody.innerHTML = customers.map(c => `
     <tr onclick="window.location.hash='/customers/${c.id}'" data-id="${c.id}">
       <td>
+        <div style="font-family:var(--font-mono);font-weight:700;color:var(--color-accent-blue)">
+          ${c.accountNumber ? escapeHtml(c.accountNumber) : '<span style="color:var(--color-accent-amber);font-weight:600">Set ID</span>'}
+        </div>
+      </td>
+      <td>
         <div style="display:flex;align-items:center;gap:12px">
           <div class="avatar avatar-sm">${getInitials(c.fullName)}</div>
           <div>
-            <div style="font-weight:500">${c.fullName}</div>
-            <div style="font-size:12px;color:var(--color-text-tertiary)">${c.email || ''}</div>
+            <div style="font-weight:500">${escapeHtml(c.fullName)}</div>
+            <div style="font-size:12px;color:var(--color-text-tertiary)">${escapeHtml(c.email || '')}</div>
           </div>
         </div>
       </td>
-      <td class="mono secondary">${c.phone}</td>
-      <td class="hide-mobile secondary">${c.city}</td>
+      <td class="mono secondary">${escapeHtml(c.phone || '')}</td>
+      <td class="hide-mobile secondary">${escapeHtml(c.city || '')}</td>
       <td class="hide-mobile" style="font-weight:600;font-family:var(--font-mono)">
         ${c.totalOutstanding > 0 ? formatCurrency(c.totalOutstanding) : '<span style="color:var(--color-accent-green)">Cleared</span>'}
       </td>
@@ -196,7 +202,7 @@ function renderTable(customers) {
           <a href="#/customers/${c.id}" class="btn btn-ghost btn-icon btn-sm" title="View" onclick="event.stopPropagation()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           </a>
-          <button class="btn btn-ghost btn-icon btn-sm edit-customer-btn" title="Edit" data-id="${c.id}" onclick="event.stopPropagation()">
+          <button class="btn btn-ghost btn-icon btn-sm edit-customer-btn" title="Edit Customer ID & details" data-id="${c.id}" onclick="event.stopPropagation()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
           </button>
         </div>
@@ -282,11 +288,11 @@ function exportCsv() {
     if (!result.success) return;
     const rows = [
       state.view === 'costs'
-        ? ['Full Name', 'Phone', 'Email', 'City', 'Status', 'Outstanding', 'Purchase Cost', 'Cost Gap', 'Joined']
-        : ['Full Name', 'Phone', 'Email', 'City', 'Status', 'Outstanding', 'Joined'],
+        ? ['Customer ID', 'Full Name', 'Phone', 'Email', 'City', 'Status', 'Outstanding', 'Purchase Cost', 'Cost Gap', 'Joined']
+        : ['Customer ID', 'Full Name', 'Phone', 'Email', 'City', 'Status', 'Outstanding', 'Joined'],
       ...result.data.map(c => state.view === 'costs'
-        ? [c.fullName, c.phone, c.email, c.city, c.status, c.totalOutstanding, c.totalPurchaseCost, c.totalCostGap, new Date(c.createdAt).toLocaleDateString()]
-        : [c.fullName, c.phone, c.email, c.city, c.status, c.totalOutstanding, new Date(c.createdAt).toLocaleDateString()]
+        ? [c.accountNumber || '', c.fullName, c.phone, c.email, c.city, c.status, c.totalOutstanding, c.totalPurchaseCost, c.totalCostGap, new Date(c.createdAt).toLocaleDateString()]
+        : [c.accountNumber || '', c.fullName, c.phone, c.email, c.city, c.status, c.totalOutstanding, new Date(c.createdAt).toLocaleDateString()]
       ),
     ];
     const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
@@ -309,4 +315,12 @@ function renderTableSkeleton(rows, cols) {
 
 function capitalize(str) {
   return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
+}
+
+function escapeHtml(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }

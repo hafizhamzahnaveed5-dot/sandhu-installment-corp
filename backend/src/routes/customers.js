@@ -134,6 +134,19 @@ router.put('/:id', requireMinRole('manager'), asyncHandler(async (req, res) => {
   if (!existing.rowCount) return fail(res, 404, 'Customer not found.');
 
   const source = { ...mapCustomer(existing.rows[0]), ...req.body };
+  const accountNumber = source.accountNumber ? String(source.accountNumber).trim() : null;
+  if (!accountNumber) {
+    return fail(res, 400, 'Customer ID / Account Number is required.');
+  }
+
+  const duplicate = await pool.query(
+    'SELECT id FROM customers WHERE account_number = $1 AND id <> $2',
+    [accountNumber, req.params.id]
+  );
+  if (duplicate.rowCount) {
+    return fail(res, 409, 'Account Number already exists on another customer.');
+  }
+
   const row = await withTransaction(async (client) => {
     const updated = await client.query(
       `UPDATE customers SET
@@ -142,7 +155,7 @@ router.put('/:id', requireMinRole('manager'), asyncHandler(async (req, res) => {
         total_outstanding=$14, sms_alerts_enabled=$15, notes=$16, updated_at=now()
        WHERE id=$1 RETURNING *`,
       [
-        req.params.id, source.fullName, source.accountNumber || null, source.cnicOrId, source.phone, source.email, source.address,
+        req.params.id, source.fullName, accountNumber, source.cnicOrId, source.phone, source.email, source.address,
         source.city, source.status, source.guarantorName, source.guarantorPhone,
         JSON.stringify(source.documents || []), source.creditScore || 0, source.totalOutstanding || 0,
         source.smsAlertsEnabled ?? true, source.notes,

@@ -61,6 +61,12 @@ export default async function init({ param }) {
               ${statusBadge}
               ${c.status === 'blacklisted' ? `<span class="badge badge-danger">⚠️ Blacklisted</span>` : ''}
             </div>
+            <div style="margin-bottom:8px">
+              <span style="font-size:12px;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.06em;font-weight:600">Customer ID</span>
+              <div style="font-family:var(--font-mono);font-size:18px;font-weight:700;color:var(--color-accent-blue)">
+                ${c.accountNumber || '<span style="color:var(--color-accent-amber)">Not set — click Edit</span>'}
+              </div>
+            </div>
             <div style="display:flex;flex-wrap:wrap;gap:var(--space-4);font-size:13px;color:var(--color-text-secondary)">
               <span>📱 ${c.phone}</span>
               ${c.email ? `<span>✉️ ${c.email}</span>` : ''}
@@ -129,6 +135,7 @@ export default async function init({ param }) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6)">
         <div class="card">
           <h4 style="margin-bottom:16px">Contact Information</h4>
+          <div class="info-row"><span class="info-label">Customer ID</span><span class="info-value mono" style="font-weight:700;color:var(--color-accent-blue)">${c.accountNumber || '—'}</span></div>
           <div class="info-row"><span class="info-label">Full Name</span><span class="info-value">${c.fullName}</span></div>
           <div class="info-row"><span class="info-label">Phone</span><span class="info-value mono">${c.phone}</span></div>
           <div class="info-row"><span class="info-label">SMS Alerts</span><span class="info-value"><span class="badge ${c.smsAlertsEnabled === false ? 'badge-inactive' : 'badge-paid'} badge-nodot">${c.smsAlertsEnabled === false ? 'Disabled' : 'Enabled'}</span></span></div>
