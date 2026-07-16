@@ -150,7 +150,17 @@ async function loadCustomers() {
   document.getElementById('customer-count').textContent =
     `${state.total} customer${state.total !== 1 ? 's' : ''}${state.search ? ' matching "' + state.search + '"' : ''}${state.view === 'costs' ? ' — purchase cost summary' : ''}`;
 
-  renderTable(result.data);
+  const sorted = [...(result.data || [])].sort((a, b) => {
+    const num = (v) => {
+      const m = String(v || '').match(/(\d+)$/);
+      return m ? Number(m[1]) : -1;
+    };
+    const diff = num(b.accountNumber) - num(a.accountNumber);
+    if (diff !== 0) return diff;
+    return String(b.accountNumber || '').localeCompare(String(a.accountNumber || ''));
+  });
+
+  renderTable(sorted);
   renderPagination();
 }
 

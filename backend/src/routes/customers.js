@@ -54,8 +54,8 @@ router.get('/', asyncHandler(async (req, res) => {
          ${whereSql}
          ORDER BY
            CASE
-             WHEN c.account_number ~ '(\d+)$'
-             THEN substring(c.account_number from '(\d+)$')::bigint
+             WHEN c.account_number ~ '[0-9]+$'
+             THEN substring(c.account_number from '[0-9]+$')::bigint
              ELSE NULL
            END DESC NULLS LAST,
            c.account_number DESC NULLS LAST,
@@ -73,8 +73,8 @@ router.get('/', asyncHandler(async (req, res) => {
          ${whereSql}
          ORDER BY
            CASE
-             WHEN c.account_number ~ '(\d+)$'
-             THEN substring(c.account_number from '(\d+)$')::bigint
+             WHEN c.account_number ~ '[0-9]+$'
+             THEN substring(c.account_number from '[0-9]+$')::bigint
              ELSE NULL
            END DESC NULLS LAST,
            c.account_number DESC NULLS LAST,
