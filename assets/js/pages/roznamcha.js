@@ -1,8 +1,11 @@
 import { renderNavbar } from '../components/navbar.js';
 import { formatCurrency, formatDate } from '../config.js';
 import Toast from '../components/toast.js';
+import Modal from '../components/modal.js';
 import AuthService from '../services/auth.service.js';
 import { api } from '../services/api.js';
+
+let activeModal = null;
 
 export default async function init() {
   const user = AuthService.getUser();
@@ -15,6 +18,21 @@ export default async function init() {
   content.innerHTML = renderShell();
   bindEvents();
   await loadRoznamcha();
+}
+
+function todayLocal() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function toDateInputValue(value) {
+  if (!value) return todayLocal();
+  const raw = String(value).trim();
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : todayLocal();
 }
 
 function renderShell() {
@@ -69,28 +87,6 @@ function renderShell() {
 
       <div id="roz-entry-list"></div>
     </div>
-
-    <div id="entry-form-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;align-items:center;justify-content:center">
-      <div style="background:var(--color-bg-elevated);border:1px solid var(--color-border);border-radius:var(--radius-lg);width:min(92vw, 480px);padding:24px;box-shadow:var(--shadow-lg)">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px">
-          <h3 id="entry-modal-title" style="margin:0">Add Expense Entry</h3>
-          <button class="btn btn-ghost btn-icon" id="close-entry-form">✕</button>
-        </div>
-        <form id="roz-entry-form">
-          <input type="hidden" id="entry-id">
-          <label class="form-label">Date</label>
-          <input type="date" id="entry-date" class="form-control" required>
-          <label class="form-label">Description</label>
-          <input type="text" id="entry-description" class="form-control" required placeholder="e.g. Chai and lunch">
-          <label class="form-label">Amount</label>
-          <input type="number" id="entry-amount" class="form-control" min="0" step="0.01" required>
-          <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
-            <button type="button" class="btn btn-ghost" id="cancel-entry-btn">Cancel</button>
-            <button type="submit" class="btn btn-primary">Save Entry</button>
-          </div>
-        </form>
-      </div>
-    </div>
   `;
 }
 
@@ -98,12 +94,6 @@ function bindEvents() {
   document.getElementById('add-entry-btn')?.addEventListener('click', () => {
     openEntryModal();
   });
-  document.getElementById('close-entry-form')?.addEventListener('click', closeModal);
-  document.getElementById('cancel-entry-btn')?.addEventListener('click', closeModal);
-  document.getElementById('entry-form-modal')?.addEventListener('click', (event) => {
-    if (event.target.id === 'entry-form-modal') closeModal();
-  });
-  document.getElementById('roz-entry-form')?.addEventListener('submit', handleCreate);
   document.getElementById('apply-filter-btn')?.addEventListener('click', () => loadRoznamcha());
   document.getElementById('filter-from')?.addEventListener('change', () => loadRoznamcha());
   document.getElementById('filter-to')?.addEventListener('change', () => loadRoznamcha());
@@ -112,21 +102,56 @@ function bindEvents() {
 }
 
 function openEntryModal(entry = null) {
-  const modal = document.getElementById('entry-form-modal');
-  const title = document.getElementById('entry-modal-title');
-  const form = document.getElementById('roz-entry-form');
-  if (modal) modal.style.display = 'flex';
-  if (title) title.textContent = entry ? 'Edit Expense Entry' : 'Add Expense Entry';
-  if (form) form.reset();
-  document.getElementById('entry-id').value = entry?.id || '';
-  document.getElementById('entry-date').value = entry?.entryDate || new Date().toISOString().slice(0, 10);
-  document.getElementById('entry-description').value = entry?.description || '';
-  document.getElementById('entry-amount').value = entry?.amount || '';
+  if (activeModal) {
+    activeModal.destroy();
+    activeModal = null;
+  }
+
+  const isEdit = Boolean(entry?.id);
+  const formHtml = `
+    <form id="roz-entry-form" class="form-grid" style="grid-template-columns:1fr">
+      <input type="hidden" id="entry-id" value="${entry?.id || ''}">
+      <div class="form-group">
+        <label class="form-label" for="entry-date">Date</label>
+        <input type="date" id="entry-date" class="form-control" required value="${toDateInputValue(entry?.entryDate)}">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="entry-description">Description</label>
+        <input type="text" id="entry-description" class="form-control" required placeholder="e.g. Chai and lunch" value="${escapeAttr(entry?.description || '')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="entry-amount">Amount</label>
+        <input type="number" id="entry-amount" class="form-control" min="0.01" step="0.01" required value="${entry?.amount ?? ''}">
+      </div>
+    </form>
+  `;
+
+  activeModal = Modal.create({
+    title: isEdit ? 'Edit Expense Entry' : 'Add Expense Entry',
+    content: formHtml,
+    footer: `
+      <button type="button" class="btn btn-ghost" id="cancel-entry-btn">Cancel</button>
+      <button type="submit" form="roz-entry-form" class="btn btn-primary" id="save-entry-btn">Save Entry</button>
+    `,
+    onClose: () => { activeModal = null; },
+  });
+
+  activeModal.open();
+
+  activeModal.backdrop.querySelector('#cancel-entry-btn')?.addEventListener('click', () => {
+    activeModal?.destroy();
+    activeModal = null;
+  });
+
+  activeModal.backdrop.querySelector('#roz-entry-form')?.addEventListener('submit', handleCreate);
 }
 
-function closeModal() {
-  const modal = document.getElementById('entry-form-modal');
-  if (modal) modal.style.display = 'none';
+function escapeAttr(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 async function handleEntryActions(event) {
@@ -143,7 +168,7 @@ async function handleEntryActions(event) {
   }
 
   if (action === 'delete') {
-    const confirmed = window.confirm('Delete this manual Roznamcha entry?');
+    const confirmed = await Modal.confirm('Delete this entry?', 'This manual Roznamcha expense will be removed permanently.');
     if (!confirmed) return;
     const res = await api.delete(`/roznamcha/${id}`);
     if (!res.success) {
@@ -157,17 +182,25 @@ async function handleEntryActions(event) {
 
 async function handleCreate(event) {
   event.preventDefault();
-  const entryId = document.getElementById('entry-id').value;
-  const payload = {
-    date: document.getElementById('entry-date').value,
-    description: document.getElementById('entry-description').value,
-    amount: document.getElementById('entry-amount').value,
-    type: 'expense',
-  };
+  const entryId = document.getElementById('entry-id')?.value || '';
+  const date = document.getElementById('entry-date')?.value;
+  const description = document.getElementById('entry-description')?.value?.trim();
+  const amount = document.getElementById('entry-amount')?.value;
 
+  if (!date || !description || !amount) {
+    Toast.error('Missing fields', 'Date, description, and amount are required.');
+    return;
+  }
+
+  const saveBtn = document.getElementById('save-entry-btn');
+  if (saveBtn) saveBtn.classList.add('loading');
+
+  const payload = { date, description, amount, type: 'expense' };
   const res = entryId
     ? await api.put(`/roznamcha/${entryId}`, payload)
     : await api.post('/roznamcha', payload);
+
+  if (saveBtn) saveBtn.classList.remove('loading');
 
   if (!res.success) {
     Toast.error('Unable to save entry', res.error || 'Please try again.');
@@ -175,8 +208,8 @@ async function handleCreate(event) {
   }
 
   Toast.success(entryId ? 'Entry updated' : 'Entry saved', entryId ? 'The expense entry was updated.' : 'The expense entry was added to Roznamcha.');
-  closeModal();
-  document.getElementById('roz-entry-form').reset();
+  activeModal?.destroy();
+  activeModal = null;
   await loadRoznamcha();
 }
 
@@ -270,7 +303,7 @@ function renderEntries(entries) {
         </div>
         <div style="display:flex;flex-direction:column;gap:8px">
           ${dayEntries.map((entry) => `
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg)">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-bg-secondary)">
               <div>
                 <div style="font-weight:600">${entry.description}</div>
                 <div class="secondary" style="margin-top:4px">${entry.type === 'purchase' ? 'Purchase' : (entry.type === 'expense' ? 'Expense' : 'Payment')}${entry.referencePlanId ? ` · Plan ${entry.referencePlanId}` : ''}</div>
