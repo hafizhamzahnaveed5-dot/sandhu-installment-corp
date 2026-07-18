@@ -7,6 +7,7 @@ import { renderNavbar } from '../components/navbar.js';
 import InstallmentsService from '../services/installments.service.js';
 import Toast from '../components/toast.js';
 import { formatDate, formatCurrency, capitalize, Config } from '../config.js';
+import { Icon } from '../components/icons.js';
 
 let state = {
   page: 1,
@@ -135,7 +136,7 @@ function renderTable(plans) {
     tbody.innerHTML = `
       <tr><td colspan="11">
         <div class="empty-state">
-          <span style="font-size:40px">📋</span>
+          ${Icon('file-text', 40)}
           <h3>No plans found</h3>
           <p>${state.status ? `No ${state.status} installment plans found.` : 'No installment plans yet.'}</p>
           <a href="#/installments/create" class="btn btn-primary mt-4">Create First Plan</a>

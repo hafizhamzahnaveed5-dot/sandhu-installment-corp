@@ -29,7 +29,7 @@ export default async function init() {
       </div>
     </div>
 
-    <div class="content-grid" style="grid-template-columns:1.2fr 0.8fr">
+    <div class="content-grid">
       <div class="card">
         <div class="card-header"><h4>Business Profile</h4></div>
         <div class="form-grid">

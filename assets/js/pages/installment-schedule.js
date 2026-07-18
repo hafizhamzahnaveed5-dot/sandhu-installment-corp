@@ -10,6 +10,7 @@ import Toast from '../components/toast.js';
 import Modal from '../components/modal.js';
 import { DonutChart } from '../components/chart.js';
 import { formatDate, formatCurrency, capitalize } from '../config.js';
+import { Icon } from '../components/icons.js';
 
 export default async function init({ param }) {
   const planId = param;
@@ -55,10 +56,10 @@ export default async function init({ param }) {
       margin-bottom:var(--space-5);
       padding:14px 20px;
       border-radius:var(--radius-md);
-      background:linear-gradient(135deg,rgba(var(--color-accent-green-rgb,34,197,94),.12),rgba(var(--color-accent-green-rgb,34,197,94),.04));
-      border:1px solid rgba(34,197,94,.3);
+      background:var(--color-accent-green-dim);
+      border:1px solid rgba(5,150,105,.3);
       display:flex;align-items:center;gap:12px">
-      <span style="font-size:22px">✨</span>
+      <span style="display:flex;color:var(--color-accent-green)">${Icon('check-circle', 22)}</span>
       <div>
         <div style="font-weight:700;color:var(--color-accent-green)">Plan Settled Early</div>
         <div style="font-size:13px;color:var(--color-text-secondary)">
@@ -104,7 +105,7 @@ export default async function init({ param }) {
       </div>
 
       <!-- Financial Distribution Row -->
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-4);margin-top:var(--space-6);padding-top:var(--space-5);border-top:1px solid var(--color-border)">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:var(--space-4);margin-top:var(--space-6);padding-top:var(--space-5);border-top:1px solid var(--color-border)">
         <div>
           <div style="font-size:12px;color:var(--color-text-tertiary)">Principal</div>
           <div style="font-size:18px;font-weight:600">${formatCurrency(plan.principalAmount)}</div>
@@ -136,17 +137,15 @@ export default async function init({ param }) {
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           ${canDeletePlan ? `
-            <button id="btn-delete-plan" class="btn btn-danger btn-sm" style="white-space:nowrap">🗑 Delete Plan</button>
+            <button id="btn-delete-plan" class="btn btn-danger btn-sm" style="white-space:nowrap">${Icon('trash', 14)} Delete Plan</button>
           ` : `
             <button class="btn btn-danger btn-sm" style="white-space:nowrap" disabled title="Delete is blocked because this plan already has payment history.">
-              🗑 Delete Plan
+              ${Icon('trash', 14)} Delete Plan
             </button>
           `}
           ${canSettle ? `
-            <button id="btn-settle-early" class="btn btn-warning" style="
-              background:linear-gradient(135deg,#f59e0b,#d97706);
-              color:#000;font-weight:700;white-space:nowrap">
-              ✦ Settle Remaining Balance
+            <button id="btn-settle-early" class="btn btn-warning" style="white-space:nowrap">
+              ${Icon('check-circle', 16)} Settle Remaining Balance
             </button>
           ` : ''}
         </div>
@@ -427,7 +426,7 @@ function showPaymentModal(schedId, number, amount, planId, onSuccess) {
 async function showSettlementModal(plan, onSuccess) {
   // Open modal immediately with a loading state
   const modal = Modal.create({
-    title: '✦ Settle Remaining Balance',
+    title: 'Settle Remaining Balance',
     size: 'lg',
     content: `
       <div id="settlement-modal-body">
@@ -435,8 +434,7 @@ async function showSettlementModal(plan, onSuccess) {
       </div>`,
     footer: `
       <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
-      <button class="btn btn-warning" id="modal-confirm" disabled
-        style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#000;font-weight:700">
+      <button class="btn btn-warning" id="modal-confirm" disabled>
         Confirm Settlement
       </button>`,
   });
@@ -450,7 +448,7 @@ async function showSettlementModal(plan, onSuccess) {
   if (!previewRes.success) {
     body.innerHTML = `
       <div class="empty-state" style="padding:24px;text-align:center">
-        <span style="font-size:32px">⚠️</span>
+        ${Icon('alert-triangle', 32)}
         <p style="color:var(--color-accent-red)">${previewRes.error || 'Failed to load settlement data.'}</p>
       </div>`;
     return;
@@ -461,7 +459,7 @@ async function showSettlementModal(plan, onSuccess) {
   if (!b.hasOpenRows) {
     body.innerHTML = `
       <div class="empty-state" style="padding:24px;text-align:center">
-        <span style="font-size:32px">✅</span>
+        ${Icon('check-circle', 32)}
         <p>All installments are already paid or settled — nothing to settle.</p>
       </div>`;
     return;
@@ -530,7 +528,7 @@ async function showSettlementModal(plan, onSuccess) {
       padding:12px 14px;border-radius:var(--radius-sm);
       background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);
       font-size:13px;color:var(--color-text-secondary);line-height:1.45">
-      ⚠️ Confirming will mark the plan <strong>Completed</strong>, close
+      <strong>Note:</strong> Confirming will mark the plan <strong>Completed</strong>, close
       ${b.openRowCount} remaining installment${b.openRowCount !== 1 ? 's' : ''},
       and record one payment for the amount received.
     </div>
@@ -563,7 +561,7 @@ async function showSettlementModal(plan, onSuccess) {
 
     if (result.success) {
       Toast.success(
-        '✨ Plan Settled',
+        'Plan Settled',
         `${formatCurrency(amount)} received · ${formatCurrency(b.markupToWaive)} markup waived`,
         { duration: 6000 },
       );

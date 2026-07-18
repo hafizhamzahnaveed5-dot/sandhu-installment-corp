@@ -12,6 +12,7 @@ import Toast from '../components/toast.js';
 import { attachSearch } from '../components/search.js';
 import { formatDate, getInitials } from '../config.js';
 import CustomersService from '../services/customers.service.js';
+import { Icon } from '../components/icons.js';
 
 let _allUsers = [];
 let _searchHandle = null;
@@ -21,10 +22,10 @@ export default async function init() {
   if (!AuthService.isAdmin()) {
     document.getElementById('page-content').innerHTML = `
       <div class="empty-state">
-        <span style="font-size:60px">🔒</span>
+        ${Icon('lock', 48)}
         <h2>Access Restricted</h2>
         <p>Only Super Admin accounts can manage staff users.</p>
-        <a href="#/dashboard" class="btn btn-primary mt-4">← Back to Dashboard</a>
+        <a href="#/dashboard" class="btn btn-primary mt-4">Back to Dashboard</a>
       </div>
     `;
     return;
@@ -117,7 +118,7 @@ function renderTable(users) {
   if (!users.length) {
     container.innerHTML = `
       <div class="empty-state" style="padding:48px">
-        <span style="font-size:48px">👤</span>
+        ${Icon('user', 44)}
         <h3>No users found</h3>
         <p>Try adjusting your search or filters.</p>
       </div>
@@ -249,7 +250,7 @@ async function openCreateModal() {
     <button class="btn btn-primary" id="cu-submit">Create User</button>
   `;
 
-  const modal = Modal.create({ title: '➕ Create New User', content: formHtml, footer: footerHtml });
+  const modal = Modal.create({ title: 'Create New User', content: formHtml, footer: footerHtml });
   modal.open();
 
   // Role description updates

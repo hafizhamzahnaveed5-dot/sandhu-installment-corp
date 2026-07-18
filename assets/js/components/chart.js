@@ -1,5 +1,5 @@
 /**
- * chart.js — Dependency-free SVG charts for the Premium Dark Fintech dashboard.
+ * chart.js — Dependency-free SVG charts for the dashboard.
  * 
  * Supported chart types:
  *   - LineChart: time-series revenue/collection chart
@@ -46,8 +46,8 @@ export function LineChart(container, data, options = {}) {
   // Defs: gradient fill
   const defs = svgEl('defs');
   const grad = svgEl('linearGradient', { id: `line-grad-${container.id || 'chart'}`, x1:'0', y1:'0', x2:'0', y2:'1' });
-  const s1 = svgEl('stop', { offset:'0%',   'stop-color': 'rgba(59,130,246,0.35)' });
-  const s2 = svgEl('stop', { offset:'100%', 'stop-color': 'rgba(59,130,246,0)' });
+  const s1 = svgEl('stop', { offset:'0%',   'stop-color': 'rgba(14,116,144,0.28)' });
+  const s2 = svgEl('stop', { offset:'100%', 'stop-color': 'rgba(14,116,144,0)' });
   grad.appendChild(s1); grad.appendChild(s2);
   defs.appendChild(grad);
   svg.appendChild(defs);
@@ -58,7 +58,7 @@ export function LineChart(container, data, options = {}) {
     const y = PAD.top + (chartH / gridCount) * i;
     const line = svgEl('line', {
       x1: PAD.left, y1: y, x2: W - PAD.right, y2: y,
-      stroke: 'rgba(255,255,255,0.06)', 'stroke-width': '1'
+      stroke: 'var(--color-border)', 'stroke-width': '1'
     });
     svg.appendChild(line);
 
@@ -104,7 +104,7 @@ export function LineChart(container, data, options = {}) {
     // Hit area
     const hit = svgEl('circle', { cx: x, cy: y, r: '16', fill: 'transparent' });
     // Outer ring (shows on hover via CSS)
-    const ring = svgEl('circle', { cx: x, cy: y, r: '6', fill: 'rgba(59,130,246,0.2)', opacity: '0', class: 'dot-ring' });
+    const ring = svgEl('circle', { cx: x, cy: y, r: '6', fill: 'rgba(14,116,144,0.2)', opacity: '0', class: 'dot-ring' });
     // Inner dot
     const dot  = svgEl('circle', { cx: x, cy: y, r: '4', fill: 'var(--color-accent-blue)', stroke: 'var(--color-bg-elevated)', 'stroke-width': '2' });
 
@@ -180,7 +180,7 @@ export function BarChart(container, data, options = {}) {
     const y = PAD.top + (chartH / 4) * i;
     svg.appendChild(svgEl('line', {
       x1: PAD.left, y1: y, x2: W - PAD.right, y2: y,
-      stroke: 'rgba(255,255,255,0.06)', 'stroke-width': '1'
+      stroke: 'var(--color-border)', 'stroke-width': '1'
     }));
     const val = maxVal - (maxVal / 4) * i;
     const lbl = svgEl('text', {

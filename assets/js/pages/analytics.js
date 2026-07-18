@@ -8,14 +8,14 @@ import { BarChart, LineChart } from '../components/chart.js';
 import { formatCurrency } from '../config.js';
 
 export default async function init() {
-  renderNavbar('Analytics', 'Performance indices and projections');
+  renderNavbar('Analytics', 'Collection trends and insights');
 
   const content = document.getElementById('page-content');
   content.innerHTML = `
     <div class="page-header">
       <div class="page-header-left">
-        <h1>Analytics &amp; Forecasting</h1>
-        <p>Operational collections performance over time</p>
+        <h1>Analytics</h1>
+        <p>Collection performance over the last 6 months</p>
       </div>
     </div>
 
@@ -38,9 +38,15 @@ export default async function init() {
   `;
 
   const chartRes = await InstallmentsService.getCollectionsChart(6);
-  if (chartRes.success) {
-    const data = chartRes.data;
-    LineChart(document.getElementById('analytics-line-container'), data, { height: 220 });
-    BarChart(document.getElementById('analytics-bar-container'), data, { height: 220 });
+  const lineEl = document.getElementById('analytics-line-container');
+  const barEl = document.getElementById('analytics-bar-container');
+
+  if (chartRes.success && chartRes.data?.length) {
+    LineChart(lineEl, chartRes.data, { height: 220 });
+    BarChart(barEl, chartRes.data, { height: 220 });
+  } else {
+    const emptyHtml = `<div class="empty-state" style="padding:40px"><p>${chartRes.success ? 'No collections data yet.' : (chartRes.error || 'Failed to load chart data.')}</p></div>`;
+    if (lineEl) lineEl.innerHTML = emptyHtml;
+    if (barEl) barEl.innerHTML = emptyHtml;
   }
 }

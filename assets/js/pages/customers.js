@@ -8,6 +8,7 @@ import CustomersService from '../services/customers.service.js';
 import Toast from '../components/toast.js';
 import { openCustomerFormModal } from '../components/customer-form-modal.js';
 import { formatDate, formatCurrency, getInitials, debounce, Config } from '../config.js';
+import { Icon } from '../components/icons.js';
 
 let state = {
   page: 1,
@@ -172,7 +173,7 @@ function renderTable(customers) {
     tbody.innerHTML = `
       <tr><td colspan="${state.view === 'costs' ? 11 : 9}">
         <div class="empty-state">
-          <span style="font-size:40px">👥</span>
+          ${Icon('customers', 40)}
           <h3>No customers found</h3>
           <p>Try adjusting your search or filters.</p>
         </div>

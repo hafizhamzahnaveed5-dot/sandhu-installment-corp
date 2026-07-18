@@ -14,6 +14,7 @@ import { Config, formatCurrency, formatDate } from '../config.js';
 import { BarChart } from '../components/chart.js';
 import EventBus from '../components/event-bus.js';
 import AuthService from '../services/auth.service.js';
+import { Icon } from '../components/icons.js';
 
 let _unsubs = [];
 
@@ -65,7 +66,7 @@ function renderShell(user) {
     </div>
 
     <!-- KPI Grid: skeleton while loading, replaced by refreshKPIs() -->
-    <div class="kpi-grid" id="dash-kpi-grid" style="grid-template-columns:repeat(7,1fr)">
+    <div class="kpi-grid" id="dash-kpi-grid">
       ${[1,2,3,4,5].map(() => `
         <div class="stat-card">
           <div class="skeleton" style="height:80px;border-radius:var(--radius-sm)"></div>
@@ -136,16 +137,16 @@ function renderQuickActions() {
   if (!nav || nav.children.length > 0) return; // already rendered
 
   const actions = [
-    { label: 'New Customer',   icon: '👤', route: 'customers' },
-    { label: 'Create Plan',    icon: '📋', route: 'installments/create' },
-    { label: 'View Payments',  icon: '💳', route: 'payments' },
-    { label: 'Roznamcha',      icon: '📒', route: 'roznamcha' },
-    { label: 'View Reports',   icon: '📈', route: 'reports' },
-    { label: 'Analytics',      icon: '📉', route: 'analytics' },
-    { label: 'Manage Staff',   icon: '👥', route: 'users' },
-    { label: 'Web Settings',   icon: '⚙️', route: 'settings' },
-    { label: 'Web Content',    icon: '📝', route: 'web-content' },
-    { label: 'Audit Logs',     icon: '🗂️', route: 'audit-logs' },
+    { label: 'New Customer',   icon: Icon('user-plus'),   route: 'customers' },
+    { label: 'Create Plan',    icon: Icon('file-text'),   route: 'installments/create' },
+    { label: 'View Payments',  icon: Icon('credit-card'), route: 'payments' },
+    { label: 'Roznamcha',      icon: Icon('book'),        route: 'roznamcha' },
+    { label: 'View Reports',   icon: Icon('bar-chart'),   route: 'reports' },
+    { label: 'Analytics',      icon: Icon('activity'),    route: 'analytics' },
+    { label: 'Manage Staff',   icon: Icon('customers'),   route: 'users' },
+    { label: 'Web Settings',   icon: Icon('settings'),    route: 'settings' },
+    { label: 'Web Content',    icon: Icon('book-open'),   route: 'web-content' },
+    { label: 'Audit Logs',     icon: Icon('edit'),        route: 'audit-logs' },
   ];
 
   actions.forEach(a => {
@@ -158,7 +159,7 @@ function renderQuickActions() {
       transition:background 0.15s, border-color 0.15s;
     `;
     link.innerHTML = `
-      <span style="font-size:20px;width:28px;text-align:center">${a.icon}</span>
+      <span style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;flex-shrink:0;border-radius:var(--radius-sm);background:var(--color-accent-blue-dim);color:var(--color-accent-blue)">${a.icon}</span>
       <span style="font-size:14px;font-weight:500;color:var(--color-text-primary);flex:1">${a.label}</span>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="2">
         <polyline points="9 18 15 12 9 6"/>
@@ -244,7 +245,7 @@ function refreshKPIs(summaryRes) {
     {
       label: 'Total Customers',
       value: d.totalCustomers,
-      change: '+3 this month',
+      change: 'View all customers',
       changeDir: 'up',
       // Link to customers filtered to active
       link: '#/customers?status=active',
@@ -265,7 +266,7 @@ function refreshKPIs(summaryRes) {
       // Link to installments filtered to active
       link: '#/installments?status=active',
       color: 'var(--color-accent-cyan)',
-      bg: 'rgba(34,211,238,0.1)',
+      bg: 'var(--color-accent-cyan-dim)',
       icon: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="2" y="3" width="20" height="14" rx="2"/>
         <line x1="8" y1="21" x2="16" y2="21"/>
@@ -320,8 +321,8 @@ function refreshKPIs(summaryRes) {
       changeDir: 'up',
       link: '#/customers?view=costs',
       color: 'var(--color-accent-yellow)',
-      bg: 'rgba(255,198,0,0.12)',
-      icon: `<span style="font-size:20px">📦</span>`,
+      bg: 'var(--color-accent-amber-dim)',
+      icon: Icon('package', 22),
     },
     {
       label: 'Roznamcha Net',
@@ -331,7 +332,7 @@ function refreshKPIs(summaryRes) {
       link: '#/roznamcha',
       color: 'var(--color-accent-teal)',
       bg: 'var(--color-accent-teal-dim)',
-      icon: `<span style="font-size:20px">📒</span>`,
+      icon: Icon('book', 22),
     },
   ];
 
@@ -371,8 +372,8 @@ function refreshDueList(dueRes) {
   if (!dueRes.success || !dueRes.data?.length) {
     el.innerHTML = `
       <div class="empty-state" style="padding:32px">
-        <span style="font-size:40px">✅</span>
-        <h4>All clear!</h4>
+        ${Icon('check-circle', 40)}
+        <h4>All clear</h4>
         <p>No installments overdue or due today.</p>
       </div>
     `;

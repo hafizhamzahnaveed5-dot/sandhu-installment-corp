@@ -7,12 +7,13 @@ import { renderNavbar } from '../components/navbar.js';
 import InstallmentsService from '../services/installments.service.js';
 import { formatCurrency, formatDate, debounce } from '../config.js';
 import { attachSearch } from '../components/search.js';
+import { Icon } from '../components/icons.js';
 
 let _allPayments = [];
 let _searchHandle = null;
 
 export default async function init() {
-  renderNavbar('Payments History', 'View transaction ledger entries');
+  renderNavbar('Payments', 'Transaction ledger');
 
   // Read query param — ?month=current → filter to this calendar month
   const hashPart = window.location.hash || '';
@@ -47,8 +48,8 @@ export default async function init() {
         <input id="payments-search" type="text" placeholder="Search by receipt #, plan ID, or method…">
       </div>
       ${filterMonth === 'current' ? `
-        <div class="badge badge-info badge-nodot" style="padding:8px 14px;font-size:13px">
-          📅 ${monthLabel}
+        <div class="badge badge-info badge-nodot" style="padding:8px 14px;font-size:13px;display:inline-flex;align-items:center;gap:6px">
+          ${Icon('calendar', 14)} ${monthLabel}
         </div>
       ` : ''}
     </div>
@@ -114,7 +115,7 @@ function renderTable(payments) {
     tbody.innerHTML = `
       <tr><td colspan="7">
         <div class="empty-state" style="padding:48px">
-          <span style="font-size:48px">💳</span>
+          ${Icon('credit-card', 44)}
           <h3>No transactions found</h3>
           <p>No payments match your current filter.</p>
         </div>

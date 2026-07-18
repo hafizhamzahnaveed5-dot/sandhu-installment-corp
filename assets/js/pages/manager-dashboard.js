@@ -11,6 +11,7 @@ import { formatCurrency, formatDate } from '../config.js';
 import { LineChart } from '../components/chart.js';
 import EventBus from '../components/event-bus.js';
 import AuthService from '../services/auth.service.js';
+import { Icon } from '../components/icons.js';
 
 let _unsub = null;
 
@@ -87,11 +88,11 @@ function renderShell(user) {
           <div class="card-header"><h4>Quick Actions</h4></div>
           <div style="display:flex;flex-direction:column;gap:var(--space-2)">
             ${[
-              { label: 'Add Customer',   icon: '👤', route: 'customers' },
-              { label: 'Create Plan',    icon: '📋', route: 'installments/create' },
-              { label: 'View Payments',  icon: '💳', route: 'payments' },
-              { label: 'Roznamcha',      icon: '📒', route: 'roznamcha' },
-              { label: 'Reports',        icon: '📊', route: 'reports' },
+              { label: 'Add Customer',   icon: Icon('user-plus'),   route: 'customers' },
+              { label: 'Create Plan',    icon: Icon('file-text'),   route: 'installments/create' },
+              { label: 'View Payments',  icon: Icon('credit-card'), route: 'payments' },
+              { label: 'Roznamcha',      icon: Icon('book'),        route: 'roznamcha' },
+              { label: 'Reports',        icon: Icon('bar-chart'),   route: 'reports' },
             ].map(a => `
               <a href="#/${a.route}"
                 style="display:flex;align-items:center;gap:12px;padding:11px 14px;
@@ -99,7 +100,7 @@ function renderShell(user) {
                        text-decoration:none;color:var(--color-text-secondary);transition:all var(--transition-fast)"
                 onmouseenter="this.style.background='var(--color-bg-hover)'"
                 onmouseleave="this.style.background=''">
-                <span style="font-size:20px;width:28px;text-align:center">${a.icon}</span>
+                <span style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;flex-shrink:0;border-radius:var(--radius-sm);background:var(--color-accent-blue-dim);color:var(--color-accent-blue)">${a.icon}</span>
                 <span style="font-size:14px;font-weight:500;color:var(--color-text-primary);flex:1">${a.label}</span>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="2">
                   <polyline points="9 18 15 12 9 6"/>
@@ -125,16 +126,14 @@ async function refreshAll() {
     const d = summaryRes.data;
     const grid = document.getElementById('mgr-kpi-grid');
     if (grid) grid.innerHTML = [
-      { label: 'Monthly Collections', value: formatCurrency(d.monthlyCollection, true), icon: '💰', color: 'var(--color-accent-green)', bg: 'var(--color-accent-green-dim)', link: '#/payments' },
-      { label: 'Active Plans', value: d.activePlans, icon: '📋', color: 'var(--color-accent-blue)', bg: 'var(--color-accent-blue-dim)', link: '#/installments' },
-      { label: 'Total Purchase Cost', value: formatCurrency(d.totalPurchaseCost, true), icon: '📦', color: 'var(--color-accent-yellow)', bg: 'rgba(255,198,0,0.12)', link: '#/customers?view=costs' },
-      { label: 'Total Cost Gap', value: formatCurrency(d.totalCostGap, true), icon: '📈', color: 'var(--color-accent-orange)', bg: 'rgba(255,148,0,0.12)', link: '#/customers?view=costs' },
-      { label: 'Overdue Alerts', value: d.overdueCount, icon: '⚠️', color: 'var(--color-accent-red)', bg: 'var(--color-accent-red-dim)', link: '#/installments' },
+      { label: 'Monthly Collections', value: formatCurrency(d.monthlyCollection, true), icon: Icon('dollar', 22), color: 'var(--color-accent-green)', bg: 'var(--color-accent-green-dim)', link: '#/payments' },
+      { label: 'Active Plans', value: d.activePlans, icon: Icon('file-text', 22), color: 'var(--color-accent-blue)', bg: 'var(--color-accent-blue-dim)', link: '#/installments' },
+      { label: 'Total Purchase Cost', value: formatCurrency(d.totalPurchaseCost, true), icon: Icon('package', 22), color: 'var(--color-accent-yellow)', bg: 'var(--color-accent-amber-dim)', link: '#/customers?view=costs' },
+      { label: 'Total Cost Gap', value: formatCurrency(d.totalCostGap, true), icon: Icon('trending-up', 22), color: 'var(--color-accent-orange)', bg: 'var(--color-accent-orange-dim)', link: '#/customers?view=costs' },
+      { label: 'Overdue Alerts', value: d.overdueCount, icon: Icon('alert-triangle', 22), color: 'var(--color-accent-red)', bg: 'var(--color-accent-red-dim)', link: '#/installments' },
     ].map(k => `
       <a href="${k.link}" class="stat-card" style="text-decoration:none;--accent-color:${k.color}">
-        <div class="stat-icon" style="background:${k.bg};color:${k.color}">
-          <span style="font-size:20px">${k.icon}</span>
-        </div>
+        <div class="stat-icon" style="background:${k.bg};color:${k.color}">${k.icon}</div>
         <div class="stat-value">${k.value}</div>
         <div class="stat-label">${k.label}</div>
       </a>
@@ -154,8 +153,8 @@ async function refreshAll() {
   if (!dueRes.success || !dueRes.data?.length) {
     el.innerHTML = `
       <div class="empty-state" style="padding:32px">
-        <span style="font-size:36px">✅</span>
-        <h4>All clear!</h4>
+        ${Icon('check-circle', 36)}
+        <h4>All clear</h4>
         <p>No installments due today.</p>
       </div>
     `;

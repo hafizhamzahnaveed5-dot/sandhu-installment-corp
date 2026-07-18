@@ -41,6 +41,8 @@
   --color-accent-teal:    #0F766E;
   --color-accent-teal-dim: rgba(15, 118, 110, 0.12);
   --color-accent-yellow:  #CA8A04;
+  --color-accent-orange:  #EA580C;
+  --color-accent-orange-dim: rgba(234, 88, 12, 0.12);
   /* legacy aliases used in pages */
   --color-accent-purple:  var(--color-accent-navy);
   --color-accent-purple-dim: var(--color-accent-navy-dim);
@@ -167,6 +169,8 @@
   --color-accent-teal:    #2DD4BF;
   --color-accent-teal-dim: rgba(45, 212, 191, 0.12);
   --color-accent-yellow:  #FACC15;
+  --color-accent-orange:  #FB923C;
+  --color-accent-orange-dim: rgba(251, 146, 60, 0.14);
   --color-accent-purple:  var(--color-accent-navy);
   --color-accent-purple-dim: var(--color-accent-navy-dim);
 

@@ -15,7 +15,7 @@ export default async function init() {
     <div class="page-header">
       <div class="page-header-left">
         <h1>Profile</h1>
-        <p>Operational personnel card</p>
+        <p>Your account details and security settings</p>
       </div>
     </div>
 
@@ -28,7 +28,7 @@ export default async function init() {
         </div>
       </div>
 
-      <h4 style="margin-bottom:12px;border-bottom:1px solid var(--color-border);padding-bottom:8px">Granted Scopes</h4>
+      <h4 style="margin-bottom:12px;border-bottom:1px solid var(--color-border);padding-bottom:8px">Permissions</h4>
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:32px">
         ${user?.permissions.map(p => `<span class="badge badge-nodot" style="background:var(--color-bg-secondary);border:1px solid var(--color-border)">${p}</span>`).join('')}
       </div>
@@ -45,7 +45,7 @@ export default async function init() {
         <div class="form-group">
           <label class="form-label">New Password</label>
           <input type="password" id="new-password" class="form-control" required minlength="8">
-          <div class="form-hint">Minimum 8 characters</div>
+          <small class="form-help">Minimum 8 characters</small>
         </div>
         <div class="form-group">
           <label class="form-label">Confirm New Password</label>

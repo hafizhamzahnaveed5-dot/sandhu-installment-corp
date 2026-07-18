@@ -8,6 +8,7 @@ import CustomersService from '../services/customers.service.js';
 import InstallmentsService from '../services/installments.service.js';
 import { openCustomerFormModal } from '../components/customer-form-modal.js';
 import { formatDate, formatCurrency, getInitials } from '../config.js';
+import { Icon } from '../components/icons.js';
 
 export default async function init({ param }) {
   const customerId = param;
@@ -59,7 +60,6 @@ export default async function init({ param }) {
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
               <h2 style="margin:0">${c.fullName}</h2>
               ${statusBadge}
-              ${c.status === 'blacklisted' ? `<span class="badge badge-danger">⚠️ Blacklisted</span>` : ''}
             </div>
             <div style="margin-bottom:8px">
               <span style="font-size:12px;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.06em;font-weight:600">Customer ID</span>
@@ -68,10 +68,10 @@ export default async function init({ param }) {
               </div>
             </div>
             <div style="display:flex;flex-wrap:wrap;gap:var(--space-4);font-size:13px;color:var(--color-text-secondary)">
-              <span>📱 ${c.phone}</span>
-              ${c.email ? `<span>✉️ ${c.email}</span>` : ''}
-              <span>📍 ${c.city}${c.address ? ', ' + c.address : ''}</span>
-              <span>📅 Joined ${formatDate(c.createdAt)}</span>
+              <span style="display:inline-flex;align-items:center;gap:6px">${Icon('phone', 14)} ${c.phone}</span>
+              ${c.email ? `<span style="display:inline-flex;align-items:center;gap:6px">${Icon('mail', 14)} ${c.email}</span>` : ''}
+              <span style="display:inline-flex;align-items:center;gap:6px">${Icon('map-pin', 14)} ${c.city}${c.address ? ', ' + c.address : ''}</span>
+              <span style="display:inline-flex;align-items:center;gap:6px">${Icon('calendar', 14)} Joined ${formatDate(c.createdAt)}</span>
             </div>
           </div>
         </div>
@@ -82,7 +82,7 @@ export default async function init({ param }) {
       </div>
 
       <!-- Stats row -->
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:var(--space-4);margin-top:var(--space-6);padding-top:var(--space-5);border-top:1px solid var(--color-border)">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:var(--space-4);margin-top:var(--space-6);padding-top:var(--space-5);border-top:1px solid var(--color-border)">
         <div style="text-align:center">
           <div style="font-size:20px;font-weight:700;color:var(--color-accent-blue)">${formatCurrency(c.totalOutstanding)}</div>
           <div style="font-size:12px;color:var(--color-text-tertiary)">Outstanding</div>
@@ -118,7 +118,7 @@ export default async function init({ param }) {
     <div class="tab-content active" id="tab-plans">
       ${plans.length === 0 ? `
         <div class="empty-state">
-          <span style="font-size:40px">📋</span>
+          ${Icon('file-text', 40)}
           <h3>No installment plans</h3>
           <p>This customer has no plans yet.</p>
           <a href="#/installments/create?customerId=${c.id}" class="btn btn-primary mt-4">Create First Plan</a>
@@ -132,7 +132,7 @@ export default async function init({ param }) {
 
     <!-- Personal Info tab -->
     <div class="tab-content" id="tab-info">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6)">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:var(--space-6)">
         <div class="card">
           <h4 style="margin-bottom:16px">Contact Information</h4>
           <div class="info-row"><span class="info-label">Customer ID</span><span class="info-value mono" style="font-weight:700;color:var(--color-accent-blue)">${c.accountNumber || '—'}</span></div>
@@ -161,7 +161,7 @@ export default async function init({ param }) {
     <div class="tab-content" id="tab-documents">
       ${c.documents?.length === 0 ? `
         <div class="empty-state">
-          <span style="font-size:40px">📄</span>
+          ${Icon('file', 40)}
           <h3>No documents uploaded</h3>
           <p>CNIC copies, salary slips, and other documents will appear here.</p>
         </div>
@@ -169,7 +169,7 @@ export default async function init({ param }) {
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--space-4)">
           ${c.documents.map(doc => `
             <div class="card" style="text-align:center;padding:var(--space-5)">
-              <div style="font-size:40px;margin-bottom:12px">📄</div>
+              <div style="display:flex;justify-content:center;margin-bottom:12px;color:var(--color-text-tertiary)">${Icon('file', 36)}</div>
               <div style="font-size:14px;font-weight:500">${doc.name}</div>
               <div style="font-size:12px;color:var(--color-text-tertiary);margin-top:4px">${formatDate(doc.uploadedAt)}</div>
               <a href="${doc.url}" class="btn btn-ghost btn-sm" style="margin-top:12px" target="_blank">View</a>

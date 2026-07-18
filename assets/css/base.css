@@ -199,7 +199,7 @@ p { color: var(--color-text-secondary); line-height: var(--leading-relaxed); }
 }
 @keyframes glowPulse {
   0%, 100% { box-shadow: var(--shadow-glow); }
-  50%       { box-shadow: 0 0 40px rgba(59, 130, 246, 0.4); }
+  50%       { box-shadow: 0 0 24px rgba(14, 116, 144, 0.35); }
 }
 @keyframes toastSlideIn {
   from { transform: translateX(100%); opacity: 0; }

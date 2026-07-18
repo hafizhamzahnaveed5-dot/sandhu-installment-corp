@@ -9,7 +9,8 @@ import InstallmentsService from '../services/installments.service.js';
 import CustomersService from '../services/customers.service.js';
 import AuthService from '../services/auth.service.js';
 import { DonutChart } from '../components/chart.js';
-import { formatCurrency, formatDate } from '../config.js';
+import { formatCurrency, formatDate, Config } from '../config.js';
+import { Icon } from '../components/icons.js';
 
 export default async function init() {
   const user = AuthService.getUser();
@@ -29,10 +30,10 @@ export default async function init() {
   if (!customer) {
     content.innerHTML = `
       <div class="empty-state" style="padding:80px 24px">
-        <span style="font-size:64px">👤</span>
+        ${Icon('user', 56)}
         <h2>No account linked</h2>
         <p>Your customer profile hasn't been set up yet.<br>Please contact Sandhu Installment Corporation.</p>
-        <a href="tel:+923001234567" class="btn btn-primary mt-4">📞 Contact Us</a>
+        ${Config.BUSINESS?.PHONE ? `<a href="tel:${Config.BUSINESS.PHONE}" class="btn btn-primary mt-4" style="display:inline-flex;align-items:center;gap:8px">${Icon('phone', 16)} Contact Us</a>` : ''}
       </div>
     `;
     return;
@@ -47,7 +48,7 @@ export default async function init() {
   if (!plans.length) {
     content.innerHTML = `
       <div class="empty-state" style="padding:80px 24px">
-        <span style="font-size:64px">📋</span>
+        ${Icon('file-text', 56)}
         <h2>No active plans</h2>
         <p>You don't have any installment plans yet.</p>
       </div>
@@ -91,7 +92,7 @@ export default async function init() {
         <div id="cust-donut"></div>
       </div>
 
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-4);
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:var(--space-4);
                   margin-top:var(--space-6);padding-top:var(--space-5);border-top:1px solid var(--color-border)">
         <div style="text-align:center">
           <div style="font-size:24px;font-weight:700;color:var(--color-accent-green)">${formatCurrency(paidAmount)}</div>
@@ -122,7 +123,7 @@ export default async function init() {
            <div>
              <strong>Next payment due: ${formatDate(nextDue.dueDate)}</strong><br>
              Amount: <strong>${formatCurrency(nextDue.amountDue)}</strong>
-             — Visit our office or call <a href="tel:+923001234567" style="color:inherit;text-decoration:underline">+92 300 1234567</a>
+             ${Config.BUSINESS?.PHONE ? `— Visit our office or call <a href="tel:${Config.BUSINESS.PHONE}" style="color:inherit;text-decoration:underline">${Config.BUSINESS.PHONE}</a>` : '— Visit our office to make the payment.'}
            </div>
          </div>`
       : ''
@@ -151,7 +152,7 @@ export default async function init() {
                 <td class="mono">${s.installmentNumber}</td>
                 <td class="secondary">${formatDate(s.dueDate)}</td>
                 <td style="font-weight:600;font-family:var(--font-mono)">${formatCurrency(s.amountDue)}</td>
-                <td><span class="badge badge-${s.status}">${s.status}</span></td>
+                <td><span class="badge badge-${s.status}">${s.status.charAt(0).toUpperCase() + s.status.slice(1)}</span></td>
                 <td class="secondary">${s.paidDate ? formatDate(s.paidDate) : '—'}</td>
               </tr>
             `).join('')}

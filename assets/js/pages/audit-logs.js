@@ -7,14 +7,14 @@ import AuditService from '../services/audit.service.js';
 import { formatDate } from '../config.js';
 
 export default async function init() {
-  renderNavbar('Audit Logs', 'Integrity audit trail of all manual actions');
+  renderNavbar('Audit Logs', 'Activity history');
 
   const content = document.getElementById('page-content');
   content.innerHTML = `
     <div class="page-header">
       <div class="page-header-left">
-        <h1>Audit Trail Logs</h1>
-        <p>Regulatory logs of administrative CRUD operations</p>
+        <h1>Audit Logs</h1>
+        <p>A record of every create, update, and delete action</p>
       </div>
     </div>
 
@@ -26,8 +26,8 @@ export default async function init() {
               <th>Timestamp</th>
               <th>Action</th>
               <th>Category</th>
-              <th>Subject ID</th>
-              <th>Operational Details</th>
+              <th>Record ID</th>
+              <th>Details</th>
             </tr>
           </thead>
           <tbody id="audit-tbody">

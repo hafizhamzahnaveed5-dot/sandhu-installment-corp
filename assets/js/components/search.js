@@ -19,6 +19,7 @@ import { debounce } from '../config.js';
 import AuthService from '../services/auth.service.js';
 import CustomersService from '../services/customers.service.js';
 import InstallmentsService from '../services/installments.service.js';
+import { Icon } from './icons.js';
 
 /**
  * Attach a live-search handler to an existing <input> element.
@@ -74,28 +75,28 @@ function getNavItems() {
 
   if (isCustomer) {
     return [
-      { label: 'My Plan',  subtitle: 'Your installment plan', route: 'customer-dashboard', icon: '📋', kind: 'page' },
-      { label: 'Profile',  subtitle: 'Account details',       route: 'profile',            icon: '👤', kind: 'page' },
+      { label: 'My Plan',  subtitle: 'Your installment plan', route: 'customer-dashboard', icon: Icon('file-text'), kind: 'page' },
+      { label: 'Profile',  subtitle: 'Account details',       route: 'profile',            icon: Icon('user'), kind: 'page' },
     ];
   }
 
   const items = [
-    { label: 'Dashboard',         subtitle: 'Business overview',         route: 'dashboard',           icon: '📊', kind: 'page' },
-    { label: 'Customers',         subtitle: 'Customer directory',         route: 'customers',           icon: '👥', kind: 'page' },
-    { label: 'Installment Plans', subtitle: 'Manage all plans',           route: 'installments',        icon: '📋', kind: 'page' },
-    { label: 'New Plan',          subtitle: 'Create an installment plan', route: 'installments/create', icon: '➕', kind: 'page' },
-    { label: 'Payments',          subtitle: 'Transaction ledger',         route: 'payments',            icon: '💳', kind: 'page' },
-    { label: 'Roznamcha',         subtitle: 'Daily cash book',            route: 'roznamcha',           icon: '📒', kind: 'page' },
-    { label: 'Reports',           subtitle: 'Financial reports',          route: 'reports',             icon: '📈', kind: 'page' },
-    { label: 'Analytics',         subtitle: 'Charts & insights',          route: 'analytics',           icon: '📉', kind: 'page' },
-    { label: 'Web Settings',      subtitle: 'App configuration',          route: 'settings',            icon: '⚙️', kind: 'page' },
+    { label: 'Dashboard',         subtitle: 'Business overview',         route: 'dashboard',           icon: Icon('dashboard'), kind: 'page' },
+    { label: 'Customers',         subtitle: 'Customer directory',         route: 'customers',           icon: Icon('customers'), kind: 'page' },
+    { label: 'Installment Plans', subtitle: 'Manage all plans',           route: 'installments',        icon: Icon('file-text'), kind: 'page' },
+    { label: 'New Plan',          subtitle: 'Create an installment plan', route: 'installments/create', icon: Icon('plus'), kind: 'page' },
+    { label: 'Payments',          subtitle: 'Transaction ledger',         route: 'payments',            icon: Icon('credit-card'), kind: 'page' },
+    { label: 'Roznamcha',         subtitle: 'Daily cash book',            route: 'roznamcha',           icon: Icon('book'), kind: 'page' },
+    { label: 'Reports',           subtitle: 'Financial reports',          route: 'reports',             icon: Icon('bar-chart'), kind: 'page' },
+    { label: 'Analytics',         subtitle: 'Charts & insights',          route: 'analytics',           icon: Icon('activity'), kind: 'page' },
+    { label: 'Web Settings',      subtitle: 'App configuration',          route: 'settings',            icon: Icon('settings'), kind: 'page' },
   ];
 
   if (isAdmin) {
     items.push(
-      { label: 'Staff Users',  subtitle: 'Manage staff accounts', route: 'users',       icon: '👤', kind: 'page' },
-      { label: 'Audit Logs',   subtitle: 'Activity trail',        route: 'audit-logs',  icon: '🔍', kind: 'page' },
-      { label: 'Web Content',  subtitle: 'Site content',          route: 'web-content', icon: '📝', kind: 'page' },
+      { label: 'Staff Users',  subtitle: 'Manage staff accounts', route: 'users',       icon: Icon('user'), kind: 'page' },
+      { label: 'Audit Logs',   subtitle: 'Activity trail',        route: 'audit-logs',  icon: Icon('edit'), kind: 'page' },
+      { label: 'Web Content',  subtitle: 'Site content',          route: 'web-content', icon: Icon('book-open'), kind: 'page' },
     );
   }
 
@@ -128,9 +129,9 @@ function openSearch() {
 
   _gsOverlay = document.createElement('div');
   _gsOverlay.style.cssText = `
-    position:fixed;inset:0;background:rgba(0,0,0,0.65);
+    position:fixed;inset:0;background:var(--color-bg-overlay);
     backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-    z-index:9999;display:flex;align-items:flex-start;
+    z-index:var(--z-modal);display:flex;align-items:flex-start;
     justify-content:center;padding-top:10vh;
   `;
 
@@ -215,14 +216,14 @@ function openSearch() {
           label: c.fullName,
           subtitle: `${c.accountNumber ? `ID ${c.accountNumber} · ` : ''}${c.phone || ''}${c.city ? ` · ${c.city}` : ''}`,
           route: `customers/${c.id}`,
-          icon: '👥',
+          icon: Icon('user'),
           kind: 'customer',
         }));
         plans = (planRes?.data || []).map(p => ({
           label: `Plan ${p.id}`,
           subtitle: `${p.customerName || 'Customer'}${p.productName ? ` · ${p.productName}` : ''} · ${p.status || ''}`,
           route: `installments/${p.id}`,
-          icon: '📋',
+          icon: Icon('file-text'),
           kind: 'plan',
         }));
       }
@@ -279,7 +280,7 @@ function openSearch() {
         style="display:flex;align-items:center;gap:14px;padding:10px 12px;
                border-radius:var(--radius-sm);text-decoration:none;
                color:var(--color-text-primary);transition:background 0.1s;cursor:pointer">
-        <span style="font-size:20px;width:28px;text-align:center">${item.icon}</span>
+        <span style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;flex-shrink:0;border-radius:var(--radius-sm);background:var(--color-accent-blue-dim);color:var(--color-accent-blue)">${item.icon}</span>
         <div style="flex:1;min-width:0">
           <div style="font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(item.label)}</div>
           <div style="font-size:12px;color:var(--color-text-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(item.subtitle || '')}</div>

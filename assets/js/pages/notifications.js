@@ -14,7 +14,7 @@ export default async function init() {
     <div class="page-header">
       <div class="page-header-left">
         <h1>All Notifications</h1>
-        <p>Direct alert records history</p>
+        <p>Alerts and reminders from your account activity</p>
       </div>
     </div>
 
@@ -49,7 +49,7 @@ export default async function init() {
     <tr>
       <td class="secondary">${formatDate(n.createdAt)}</td>
       <td style="font-weight:500">${n.message}</td>
-      <td><span class="badge ${n.isRead ? 'badge-inactive' : 'badge-paid'} badge-nodot">${n.isRead ? 'READ' : 'NEW'}</span></td>
+      <td><span class="badge ${n.isRead ? 'badge-inactive' : 'badge-info'} badge-nodot">${n.isRead ? 'Read' : 'New'}</span></td>
     </tr>
   `).join('');
 }
