@@ -4,11 +4,21 @@ A production-grade, highly optimized vanilla single-page application (SPA) clien
 
 ## Architecture
 
-This frontend is designed to be fully data-driven. A clean abstraction layer separates components/pages from direct network logic.
+```
+Browser / Android APK  →  Vercel (static SPA + /api Express)  →  Neon Postgres
+```
+
+- **Frontend:** vanilla SPA at repo root (`index.html`, `assets/`)
+- **API:** Express app in `backend/`, exposed on Vercel via `api/index.js`
+- **Database:** Neon Postgres (`DATABASE_URL`)
+
+Railway is not required. Local API: `npm run dev:api` in `backend/` (or `npm run start:api` from root).
 
 ### Directory Structure
 
 ```
+/api
+  index.js              → Vercel serverless entry (exports Express app)
 /assets
   /css
     tokens.css          → Design variables (color, padding, borders, radius)
@@ -36,8 +46,38 @@ This frontend is designed to be fully data-driven. A clean abstraction layer sep
       products.mock.js
     config.js           → Feature toggles, constants, string format utilities
     app.js              → SPA theme hook, hash-based router, FAB floating handlers
+/backend                → Express + Postgres (shared by local + Vercel)
+vercel.json             → Rewrites /api/* to the serverless function
 index.html              → Main entry index template
 README.md               → This configuration handbook
+```
+
+## Deploy on Vercel + Neon (production)
+
+1. **Neon:** copy the pooled connection string (`…-pooler…` / `sslmode=require`).
+2. **Vercel project** (this GitHub repo) → **Settings → Environment Variables** — set:
+
+| Variable | Value |
+|----------|--------|
+| `DATABASE_URL` | Neon pooled connection string |
+| `JWT_SECRET` | Long random secret (reuse the one from Railway if migrating) |
+| `FRONTEND_ORIGIN` | `https://sandhu-installment-corp.vercel.app` (comma-separate extra origins if needed) |
+| `ENABLE_SMS_SCHEDULER` | `false` |
+| Twilio vars (optional) | Only if SMS is configured |
+
+   Or use **Vercel → Integrations → Neon** to inject `DATABASE_URL` automatically.
+
+3. Deploy (push to `main` or `vercel --prod`).
+4. Check health: `https://YOUR-APP.vercel.app/api/health`
+5. Log in and smoke-test customers / payments / Roznamcha.
+6. **Remove Railway** once Vercel API works (stops the extra host).
+
+Migrations (against Neon) stay local:
+
+```bash
+cd backend
+# DATABASE_URL=…neon… in backend/.env
+npm run migrate
 ```
 
 ## API Integration Contract
@@ -45,7 +85,7 @@ README.md               → This configuration handbook
 When taking this platform live and plugging it into a real database/API:
 1. Open `assets/js/config.js`.
 2. Toggle `FEATURE_FLAGS.MOCK_MODE` to `false`.
-3. Set `API_BASE_URL` to point to the live server (e.g. `https://api.sandhuinstallments.com`).
+3. Set `API_BASE_URL` to `'/api'` on Vercel (same origin), or `http://localhost:3000/api` for local API.
 4. Ensure your server matches the endpoint expectations described below.
 
 ### Expected Backend Endpoints

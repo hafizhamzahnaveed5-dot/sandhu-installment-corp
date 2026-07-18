@@ -1,0 +1,23 @@
+{
+  "name": "sandhu-installment-corp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Sandhu IC frontend + Express API on Vercel (Neon Postgres)",
+  "scripts": {
+    "start:api": "npm --prefix backend start",
+    "dev:api": "npm --prefix backend run dev",
+    "migrate": "npm --prefix backend run migrate"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

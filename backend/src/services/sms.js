@@ -173,7 +173,8 @@ export async function runDueSmsSweep({ dueSoonDays = 2 } = {}) {
 }
 
 export function scheduleDailySmsSweep() {
-  if (!config.smsSchedulerEnabled) return null;
+  // Serverless (Vercel) has no long-lived process — skip interval scheduler
+  if (process.env.VERCEL || !config.smsSchedulerEnabled) return null;
   const dayMs = 24 * 60 * 60 * 1000;
   const run = () => runDueSmsSweep().catch((error) => {
     console.error('[sms] due/overdue sweep failed:', error);

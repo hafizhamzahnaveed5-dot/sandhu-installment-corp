@@ -17,7 +17,8 @@ export const Config = {
   // DECISION: Set this to your backend URL when connecting a real database.
   // e.g., 'https://api.sandhuinstallments.com' for production
   //       'http://localhost:3000' for local dev
-  API_BASE_URL: 'https://sandhu-installment-corp-production.up.railway.app/api',
+  // Same-origin API on Vercel (Express serverless → Neon). Local: point at http://localhost:3000/api
+  API_BASE_URL: '/api',
 
   // ── Feature Flags ──────────────────────────────────────────
   FEATURE_FLAGS: {

@@ -3,8 +3,14 @@ import { config, requireConfig } from './config.js';
 
 requireConfig();
 
+const isServerless = Boolean(process.env.VERCEL);
+
 export const pool = new pg.Pool({
   connectionString: config.databaseUrl,
+  // Serverless: keep the pool tiny so Neon connections are not exhausted
+  max: isServerless ? 1 : 10,
+  idleTimeoutMillis: isServerless ? 10_000 : 30_000,
+  connectionTimeoutMillis: 15_000,
 });
 
 export async function query(text, params = []) {

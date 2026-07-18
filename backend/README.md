@@ -27,6 +27,8 @@ TWILIO_PHONE_NUMBER=+1xxxxxxxxxx
 ENABLE_SMS_SCHEDULER=true
 ```
 
+**Production (Vercel):** set the same variables in the Vercel project dashboard (not in git). Use Neon’s pooled `DATABASE_URL`, set `FRONTEND_ORIGIN` to your Vercel URL, and `ENABLE_SMS_SCHEDULER=false`. The SPA calls same-origin `/api` via `api/index.js` — Railway is not required.
+
 Secrets must come from environment variables. Do not hardcode production database URLs or JWT secrets.
 
 Twilio variables are required for real SMS delivery. If they are missing, payment and due/overdue actions still succeed, but the SMS attempt is logged as `failed` in `sms_notifications_log`.

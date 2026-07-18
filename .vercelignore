@@ -1,0 +1,10 @@
+android-app
+backend/node_modules
+backend/tmp_*
+backend/temp_*
+backend/*.log
+node_modules
+.git
+**/.env
+**/.env.*
+!**/.env.example
