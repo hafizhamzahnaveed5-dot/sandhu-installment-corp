@@ -26,6 +26,16 @@ export function createApp() {
 
   app.get('/health', (_req, res) => res.status(200).json({ status: 'ok' }));
   app.get('/api/health', (_req, res) => ok(res, { status: 'ok' }));
+  app.get('/api/health/db', async (_req, res) => {
+    try {
+      const { pool } = await import('./db.js');
+      const result = await pool.query('SELECT 1 AS ok');
+      return ok(res, { status: 'ok', db: result.rows[0]?.ok === 1 });
+    } catch (error) {
+      console.error('[health/db]', error);
+      return fail(res, 500, `Database connection failed: ${error.message}`);
+    }
+  });
 
   app.use('/api/auth', authRoutes);
   app.use('/api/customers', customerRoutes);
@@ -45,6 +55,14 @@ export function createApp() {
     console.error(error);
     if (error?.status && typeof error.message === 'string') {
       return fail(res, error.status, error.message);
+    }
+    // Surface common Neon/pg failures clearly (still safe — no secrets)
+    const msg = String(error?.message || '');
+    if (/password authentication failed/i.test(msg)) {
+      return fail(res, 500, 'Database password rejected. Update DATABASE_URL on Vercel from Neon (pooled) or Railway.');
+    }
+    if (/timeout|ECONNREFUSED|ENOTFOUND|SSL|certificate|connection/i.test(msg)) {
+      return fail(res, 500, `Database connection error: ${msg}`);
     }
     return fail(res, 500, 'Internal server error.');
   });
