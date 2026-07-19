@@ -30,15 +30,15 @@ router.get('/', asyncHandler(async (req, res) => {
 
   if (from) {
     values.push(from);
-    where.push(`entry_date >= $${values.length}`);
+    where.push(`r.entry_date >= $${values.length}`);
   }
   if (to) {
     values.push(to);
-    where.push(`entry_date <= $${values.length}`);
+    where.push(`r.entry_date <= $${values.length}`);
   }
   if (allowedType !== 'all') {
     values.push(allowedType);
-    where.push(`type = $${values.length}`);
+    where.push(`r.type = $${values.length}`);
   }
 
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';

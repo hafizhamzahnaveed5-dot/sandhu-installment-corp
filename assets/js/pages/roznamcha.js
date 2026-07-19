@@ -16,6 +16,9 @@ export default async function init() {
 
   const content = document.getElementById('page-content');
   content.innerHTML = renderShell();
+  // Default "To" = today so future-dated mistakes don't bury today's payments
+  const toInput = document.getElementById('filter-to');
+  if (toInput) toInput.value = todayLocal();
   bindEvents();
   await loadRoznamcha();
 }
@@ -43,7 +46,15 @@ function formatRoznamchaDescription(entry) {
     // Replace any leftover plan-{uuid} fragment if description wasn't rewritten
     text = text.replace(/plan-[0-9a-f-]{20,}/gi, planId);
   }
-  return text;
+  return escapeHtml(text);
+}
+
+function escapeHtml(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function renderShell() {
@@ -74,7 +85,7 @@ function renderShell() {
 
     <div class="card">
       <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-        <h4>Ledger Entries</h4>
+        <h4>Ledger Entries <span id="roz-entry-count" class="secondary" style="font-weight:500;font-size:13px"></span></h4>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
           <label style="display:flex;flex-direction:column;font-size:12px;color:var(--color-text-secondary)">
             <span>From</span>
@@ -94,7 +105,7 @@ function renderShell() {
             </select>
           </label>
           <button class="btn btn-ghost" id="apply-filter-btn">Apply</button>
-          <button class="btn btn-secondary" id="clear-filter-btn">Clear</button>
+          <button class="btn btn-secondary" id="clear-filter-btn" title="Reset to today">Reset</button>
         </div>
       </div>
 
@@ -113,7 +124,7 @@ function bindEvents() {
     const to = document.getElementById('filter-to');
     const type = document.getElementById('filter-type');
     if (from) from.value = '';
-    if (to) to.value = '';
+    if (to) to.value = todayLocal();
     if (type) type.value = 'all';
     // Keep dd-mm-yyyy display fields in sync if date-input enhancer is active
     from?.dispatchEvent(new Event('change', { bubbles: true }));
@@ -243,10 +254,16 @@ async function loadRoznamcha() {
   const to = document.getElementById('filter-to')?.value || '';
   const type = document.getElementById('filter-type')?.value || 'all';
 
+  const listParams = {};
+  const summaryParams = {};
+  if (from) { listParams.from = from; summaryParams.from = from; }
+  if (to) { listParams.to = to; summaryParams.to = to; }
+  if (type && type !== 'all') listParams.type = type;
+
   try {
     const [entriesRes, summaryRes] = await Promise.all([
-      api.get('/roznamcha', { from, to, type }),
-      api.get('/roznamcha/summary', { from, to }),
+      api.get('/roznamcha', listParams),
+      api.get('/roznamcha/summary', summaryParams),
     ]);
 
     if (entriesRes.success) renderEntries(entriesRes.data || []);
@@ -313,31 +330,40 @@ function buildSummaryNote(from, to, period = {}) {
 
 function renderEntries(entries) {
   const container = document.getElementById('roz-entry-list');
+  const countEl = document.getElementById('roz-entry-count');
   if (!container) return;
 
+  if (countEl) {
+    countEl.textContent = entries.length
+      ? `(${entries.length} shown)`
+      : '';
+  }
+
   if (!entries.length) {
-    container.innerHTML = '<div class="empty-state" style="padding:32px"><h3>No ledger entries found</h3><p>Try clearing the date/type filters, or add a manual expense entry.</p></div>';
+    container.innerHTML = '<div class="empty-state" style="padding:32px"><h3>No ledger entries found</h3><p>Try widening the date range, or click Reset. Payments with a future payment date only appear when To is cleared or set later.</p></div>';
     return;
   }
 
   const grouped = entries.reduce((acc, entry) => {
-    const date = entry.entryDate;
+    const date = entry.entryDate || 'unknown';
     if (!acc[date]) acc[date] = [];
     acc[date].push(entry);
     return acc;
   }, {});
 
   const dates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+  const today = todayLocal();
   container.innerHTML = dates.map((date) => {
     const dayEntries = grouped[date];
     const dayIn = dayEntries.filter(e => e.type === 'payment_received').reduce((s, e) => s + Number(e.amount || 0), 0);
     const dayOut = dayEntries.filter(e => e.type !== 'payment_received').reduce((s, e) => s + Number(e.amount || 0), 0);
     const dayTotal = dayIn - dayOut;
+    const isFuture = date > today;
     return `
       <div class="card" style="margin-bottom:12px;padding:16px;background:var(--color-bg-elevated)">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px">
           <div>
-            <div style="font-weight:700">${formatDate(date)}</div>
+            <div style="font-weight:700">${formatDate(date)}${isFuture ? ' <span class="badge badge-warning badge-nodot">Future date</span>' : ''}</div>
             <div class="secondary">${dayEntries.length} entries · In: ${formatCurrency(dayIn)} · Out: ${formatCurrency(dayOut)}</div>
           </div>
           <div style="font-weight:700;color:var(--color-accent-blue)">${formatCurrency(dayTotal)}</div>
@@ -351,11 +377,10 @@ function renderEntries(entries) {
                   const planId = entry.planDisplayId || entry.referencePlanId;
                   const custId = entry.customerAccountNumber;
                   const bits = [];
-                  if (custId) bits.push(`Customer ${custId}`);
-                  // Avoid repeating the same ID when plan id already equals customer account
-                  if (planId && planId !== custId) bits.push(`Plan ${planId}`);
+                  if (custId) bits.push(`Customer ${escapeHtml(custId)}`);
+                  if (planId && planId !== custId) bits.push(`Plan ${escapeHtml(planId)}`);
                   return bits.length ? ` · ${bits.join(' · ')}` : '';
-                })()}${entry.customerName ? ` · ${entry.customerName}` : ''}</div>
+                })()}${entry.customerName ? ` · ${escapeHtml(entry.customerName)}` : ''}</div>
               </div>
               <div style="text-align:right">
                 <div class="badge ${entry.type === 'purchase' ? 'badge-info' : (entry.type === 'expense' ? 'badge-danger' : 'badge-success')}">${entry.type === 'purchase' ? 'Purchase' : (entry.type === 'expense' ? 'Expense' : 'Payment')}</div>
