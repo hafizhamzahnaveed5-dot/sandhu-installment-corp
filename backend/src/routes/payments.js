@@ -7,6 +7,7 @@ import { sendPaymentConfirmation } from '../services/sms.js';
 import { newId, receiptNumber } from '../utils/ids.js';
 import { parseBusinessDateTime, pgDateOnly, todayDateOnly, toDateOnly } from '../utils/dates.js';
 import { asyncHandler, fail, ok, pagination, paginationParams } from '../utils/respond.js';
+import { insertPaymentReceivedEntry } from '../services/roznamcha-auto.js';
 
 const router = express.Router();
 
@@ -109,18 +110,17 @@ router.post('/', requireMinRole('agent'), asyncHandler(async (req, res) => {
       ]
     );
 
-    // Create a Roznamcha ledger entry for this payment (payment_received)
-    try {
-      const custRes = await client.query('SELECT full_name FROM customers WHERE id = $1', [scheduleRow.customer_id]);
-      const customerName = custRes.rows[0]?.full_name || null;
-      await client.query(
-        `INSERT INTO roznamcha_entries (id, entry_date, type, description, amount, reference_plan_id, reference_payment_id, created_by)
-         VALUES ($1, $2, 'payment_received', $3, $4, $5, $6, $7)`,
-        [newId('roz'), paidAtDate, `Installment payment received from ${customerName || 'customer'} - Plan ${planId}`, amount, planId, inserted.rows[0].id, req.user.id]
-      );
-    } catch (err) {
-      console.error('Roznamcha auto-entry failed for payment:', err);
-    }
+    // Always create a Roznamcha ledger line in the same transaction
+    const custRes = await client.query('SELECT full_name FROM customers WHERE id = $1', [scheduleRow.customer_id]);
+    const customerName = custRes.rows[0]?.full_name || null;
+    await insertPaymentReceivedEntry(client, {
+      entryDate: paidAtDate,
+      amount,
+      planId,
+      paymentId: inserted.rows[0].id,
+      customerName,
+      createdBy: req.user.id,
+    });
 
     if (isEarlySettlement) {
       const waiveResult = await client.query(

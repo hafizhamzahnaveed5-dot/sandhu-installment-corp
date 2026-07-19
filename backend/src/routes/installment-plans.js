@@ -7,6 +7,7 @@ import { calculateSettlementBreakdown, performEarlySettlement } from '../service
 import { asyncHandler, fail, ok, pagination, paginationParams } from '../utils/respond.js';
 import { newId } from '../utils/ids.js';
 import { todayDateOnly, toDateOnly } from '../utils/dates.js';
+import { insertPurchaseEntry } from '../services/roznamcha-auto.js';
 
 const router = express.Router();
 
@@ -380,15 +381,13 @@ router.post('/', requireMinRole('manager'), asyncHandler(async (req, res) => {
       [req.body.customerId]
     );
 
-    try {
-      await client.query(
-        `INSERT INTO roznamcha_entries (id, entry_date, type, description, amount, reference_plan_id, created_by)
-         VALUES ($1, $2, 'purchase', $3, $4, $5, $6)`,
-        [newId('roz'), planStartDate, `Purchase cost for plan ${id}`, purchaseCost, id, req.user.id]
-      );
-    } catch (error) {
-      console.error('Roznamcha auto-entry failed for plan creation:', error);
-    }
+    await insertPurchaseEntry(client, {
+      entryDate: planStartDate,
+      amount: purchaseCost,
+      planId: id,
+      createdBy: req.user.id,
+      description: `Purchase cost for plan ${id}`,
+    });
 
     await writeAudit(client, req.user.id, 'CREATE', 'InstallmentPlan', id, `Created plan for customer ${req.body.customerId}`);
     return inserted.rows[0];

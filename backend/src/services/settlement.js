@@ -18,6 +18,7 @@
 import { newId, receiptNumber } from '../utils/ids.js';
 import { parseBusinessDateTime, pgDateOnly, todayDateOnly, toDateOnly } from '../utils/dates.js';
 import { writeAudit } from './audit.js';
+import { insertPaymentReceivedEntry } from './roznamcha-auto.js';
 
 /**
  * Calculate settlement numbers for a plan as of a given date.
@@ -110,26 +111,18 @@ export async function performEarlySettlement(client, {
     ],
   );
 
-  // Roznamcha payment_received for settlement
-  try {
-    const custRes = await client.query('SELECT full_name FROM customers WHERE id = $1', [customerId]);
-    const customerName = custRes.rows[0]?.full_name || 'customer';
-    await client.query(
-      `INSERT INTO roznamcha_entries (id, entry_date, type, description, amount, reference_plan_id, reference_payment_id, created_by)
-       VALUES ($1, $2, 'payment_received', $3, $4, $5, $6, $7)`,
-      [
-        newId('roz'),
-        paidAtDate,
-        `Early settlement payment from ${customerName} - Plan ${planId}`,
-        amount,
-        planId,
-        paymentId,
-        userId,
-      ]
-    );
-  } catch (err) {
-    console.error('Roznamcha auto-entry failed for settlement:', err);
-  }
+  // Roznamcha payment_received for settlement (same transaction)
+  const custRes = await client.query('SELECT full_name FROM customers WHERE id = $1', [customerId]);
+  const customerName = custRes.rows[0]?.full_name || 'customer';
+  await insertPaymentReceivedEntry(client, {
+    entryDate: paidAtDate,
+    amount,
+    planId,
+    paymentId,
+    customerName,
+    createdBy: userId,
+    description: `Early settlement payment from ${customerName} - Plan ${planId}`,
+  });
 
   // ── 2. Settle future rows (waive their markup) ──
   await client.query(

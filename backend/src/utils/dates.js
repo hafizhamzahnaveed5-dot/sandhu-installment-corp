@@ -1,41 +1,46 @@
 /**
- * Date helpers that avoid UTC day-shifts for Pakistan (UTC+5) business dates.
- * Prefer calendar YYYY-MM-DD strings over Date#toISOString for DATE fields.
+ * Date helpers locked to Pakistan business calendar (Asia/Karachi).
+ * Avoids UTC day-shifts on Vercel serverless (which runs in UTC).
  */
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+export const BUSINESS_TZ = 'Asia/Karachi';
+
+/** Format an instant as YYYY-MM-DD in the business timezone. */
+function formatInBusinessTz(date) {
+  // en-CA → YYYY-MM-DD
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: BUSINESS_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
 
 /** Return YYYY-MM-DD if value is a valid calendar date string; else null. */
 export function toDateOnly(value) {
   if (value == null || value === '') return null;
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) return null;
-    const y = value.getFullYear();
-    const m = String(value.getMonth() + 1).padStart(2, '0');
-    const d = String(value.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
+    return formatInBusinessTz(value);
   }
 
   const raw = String(value).trim();
   if (DATE_ONLY.test(raw)) return raw;
 
-  // ISO / timestamptz → use local calendar day (server local TZ)
   const parsed = new Date(raw);
   if (Number.isNaN(parsed.getTime())) return null;
-  const y = parsed.getFullYear();
-  const m = String(parsed.getMonth() + 1).padStart(2, '0');
-  const d = String(parsed.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return formatInBusinessTz(parsed);
 }
 
-/** Today's calendar date in local timezone as YYYY-MM-DD. */
+/** Today's calendar date in Asia/Karachi as YYYY-MM-DD. */
 export function todayDateOnly() {
-  return toDateOnly(new Date());
+  return formatInBusinessTz(new Date());
 }
 
 /**
  * Parse a business date for timestamptz storage.
- * Date-only strings are stored as UTC midnight so ::date matches the calendar day.
+ * Date-only strings are stored as UTC midnight so the calendar day is preserved.
  */
 export function parseBusinessDateTime(value) {
   if (value == null || value === '') return new Date();
@@ -46,7 +51,7 @@ export function parseBusinessDateTime(value) {
   return parsed;
 }
 
-/** pg DATE / timestamp → YYYY-MM-DD without UTC shift for DATE values. */
+/** pg DATE / timestamp → YYYY-MM-DD without timezone day-shift. */
 export function pgDateOnly(value) {
   if (value == null) return null;
   if (typeof value === 'string') {
@@ -55,17 +60,10 @@ export function pgDateOnly(value) {
   }
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) return null;
-    // Prefer calendar components that match how DATE values are usually
-    // materialised by node-pg (local midnight). If the instant is exactly
-    // UTC midnight, UTC components are safer for serverless (Vercel = UTC).
     const iso = value.toISOString();
-    if (iso.endsWith('T00:00:00.000Z')) {
-      return iso.slice(0, 10);
-    }
-    const y = value.getFullYear();
-    const m = String(value.getMonth() + 1).padStart(2, '0');
-    const d = String(value.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
+    // node-pg often returns DATE as UTC midnight
+    if (iso.endsWith('T00:00:00.000Z')) return iso.slice(0, 10);
+    return formatInBusinessTz(value);
   }
   return toDateOnly(value);
 }
