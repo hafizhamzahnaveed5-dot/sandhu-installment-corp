@@ -43,7 +43,17 @@ router.get('/', asyncHandler(async (req, res) => {
 
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const result = await pool.query(
-    `SELECT r.*, u.name AS created_by_name,
+    `SELECT r.id,
+            r.entry_date::text AS entry_date,
+            r.type,
+            r.description,
+            r.amount,
+            r.reference_plan_id,
+            r.reference_payment_id,
+            r.created_by,
+            r.created_at,
+            r.updated_at,
+            u.name AS created_by_name,
             ip.id AS plan_id,
             c.account_number AS customer_account_number,
             c.full_name AS customer_name

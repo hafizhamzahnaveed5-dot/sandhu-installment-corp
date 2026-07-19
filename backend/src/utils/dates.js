@@ -49,14 +49,22 @@ export function parseBusinessDateTime(value) {
 /** pg DATE / timestamp → YYYY-MM-DD without UTC shift for DATE values. */
 export function pgDateOnly(value) {
   if (value == null) return null;
-  if (typeof value === 'string' && DATE_ONLY.test(value.slice(0, 10))) {
-    return value.slice(0, 10);
+  if (typeof value === 'string') {
+    const m = value.trim().match(/^(\d{4}-\d{2}-\d{2})/);
+    if (m) return m[1];
   }
   if (value instanceof Date) {
-    // node-pg returns DATE as UTC midnight; use UTC components for those
-    const y = value.getUTCFullYear();
-    const m = String(value.getUTCMonth() + 1).padStart(2, '0');
-    const d = String(value.getUTCDate()).padStart(2, '0');
+    if (Number.isNaN(value.getTime())) return null;
+    // Prefer calendar components that match how DATE values are usually
+    // materialised by node-pg (local midnight). If the instant is exactly
+    // UTC midnight, UTC components are safer for serverless (Vercel = UTC).
+    const iso = value.toISOString();
+    if (iso.endsWith('T00:00:00.000Z')) {
+      return iso.slice(0, 10);
+    }
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, '0');
+    const d = String(value.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
   }
   return toDateOnly(value);

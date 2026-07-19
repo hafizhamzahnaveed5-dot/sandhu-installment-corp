@@ -94,6 +94,7 @@ function renderShell() {
             </select>
           </label>
           <button class="btn btn-ghost" id="apply-filter-btn">Apply</button>
+          <button class="btn btn-secondary" id="clear-filter-btn">Clear</button>
         </div>
       </div>
 
@@ -107,6 +108,18 @@ function bindEvents() {
     openEntryModal();
   });
   document.getElementById('apply-filter-btn')?.addEventListener('click', () => loadRoznamcha());
+  document.getElementById('clear-filter-btn')?.addEventListener('click', () => {
+    const from = document.getElementById('filter-from');
+    const to = document.getElementById('filter-to');
+    const type = document.getElementById('filter-type');
+    if (from) from.value = '';
+    if (to) to.value = '';
+    if (type) type.value = 'all';
+    // Keep dd-mm-yyyy display fields in sync if date-input enhancer is active
+    from?.dispatchEvent(new Event('change', { bubbles: true }));
+    to?.dispatchEvent(new Event('change', { bubbles: true }));
+    loadRoznamcha();
+  });
   document.getElementById('filter-from')?.addEventListener('change', () => loadRoznamcha());
   document.getElementById('filter-to')?.addEventListener('change', () => loadRoznamcha());
   document.getElementById('filter-type')?.addEventListener('change', () => loadRoznamcha());
@@ -303,7 +316,7 @@ function renderEntries(entries) {
   if (!container) return;
 
   if (!entries.length) {
-    container.innerHTML = '<div class="empty-state" style="padding:32px"><h3>No ledger entries found</h3><p>Try a different date range or add your first expense entry.</p></div>';
+    container.innerHTML = '<div class="empty-state" style="padding:32px"><h3>No ledger entries found</h3><p>Try clearing the date/type filters, or add a manual expense entry.</p></div>';
     return;
   }
 
